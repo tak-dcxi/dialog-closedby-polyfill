@@ -12,7 +12,7 @@ export type ClosedBy = "any" | "closerequest" | "none";
 /**
  * Detects native support for the `closedBy` property. If this function returns
  * `true`, **no** polyfill is needed because the user‑agent already exposes
- * the expected behaviour.
+ * the expected behavior.
  */
 export function isSupported(): boolean;
 

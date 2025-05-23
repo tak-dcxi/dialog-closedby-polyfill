@@ -158,10 +158,10 @@ This polyfill works in all browsers that support the native `<dialog>` element.
 
 **Native `closedby` support:**
 
-- Chrome 126+ (planned)
+- Chrome 134+
 - Safari: Not implemented yet
 - Firefox: Not implemented yet
-- Edge: Not implemented yet
+- Edge: 134+
 
 **Dialog element support (required for polyfill):**
 

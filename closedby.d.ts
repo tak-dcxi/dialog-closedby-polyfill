@@ -7,17 +7,8 @@ declare global {
         closedBy?: "any" | "closerequest" | "none";
     }
 }
-/**
- * Check if closedBy attribute is natively supported
- * @returns true if closedBy is natively supported, false otherwise
- */
+/** Returns true when closedBy is implemented natively. */
 export declare function isSupported(): boolean;
-/**
- * Check if the polyfill has been applied
- * @returns true if the polyfill has been applied, false otherwise
- */
+/** Returns true when this polyfill has been applied. */
 export declare function isPolyfilled(): boolean;
-/**
- * Apply the closedBy polyfill
- */
 export declare function apply(): void;

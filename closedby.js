@@ -2,180 +2,146 @@
  * HTMLDialogElement closedBy attribute polyfill
  * @see https://developer.mozilla.org/en-US/docs/Web/API/HTMLDialogElement/closedBy
  */
-// Track if polyfill has been applied
+/* ------------------------------------------------------------------ */
+/*  Public helpers                                                    */
+/* ------------------------------------------------------------------ */
 let polyfilled = false;
-/**
- * Check if closedBy attribute is natively supported
- * @returns true if closedBy is natively supported, false otherwise
- */
+/** Returns true when closedBy is implemented natively. */
 export function isSupported() {
     return (typeof HTMLDialogElement !== "undefined" &&
         typeof HTMLDialogElement.prototype === "object" &&
         "closedBy" in HTMLDialogElement.prototype);
 }
-/**
- * Check if the polyfill has been applied
- * @returns true if the polyfill has been applied, false otherwise
- */
+/** Returns true when this polyfill has been applied. */
 export function isPolyfilled() {
     return polyfilled;
 }
-/**
- * Apply the closedBy polyfill
- */
+/* ------------------------------------------------------------------ */
+/*  Polyfill entry point                                              */
+/* ------------------------------------------------------------------ */
 export function apply() {
     "use strict";
-    // Prevent applying multiple times
-    if (polyfilled || isSupported()) {
-        return;
-    }
-    // WeakMap to manage dialog states
+    if (polyfilled || isSupported())
+        return; // guard against double-apply
+    /** Maps each dialog to its active listeners so we can detach them later. */
     const dialogStates = new WeakMap();
-    // Store original methods
+    /* Preserve original methods */
     const originalShowModal = HTMLDialogElement.prototype.showModal;
     const originalClose = HTMLDialogElement.prototype.close;
-    /**
-     * Get the value of closedBy attribute
-     * @param dialog - Target dialog element
-     * @returns Value of closedBy attribute (default is 'any')
-     */
+    /* --------------------------------------------------------------- */
+    /*  Helper functions                                               */
+    /* --------------------------------------------------------------- */
+    /** Normalises the closedby attribute value. */
     function getClosedByValue(dialog) {
         const value = dialog.getAttribute("closedby");
-        if (value === "closerequest" || value === "none") {
-            return value;
-        }
-        return "any";
+        return value === "closerequest" || value === "none" ? value : "any";
     }
-    /**
-     * Create ESC key handler
-     * @param dialog - Target dialog element
-     * @returns Event handler function
-     */
+    /** Creates an Escape key handler for the given dialog. */
     function createEscapeHandler(dialog) {
         return function handleEscape(event) {
             if (event.key !== "Escape")
                 return;
-            const closedBy = getClosedByValue(dialog);
-            if (closedBy === "none") {
+            if (getClosedByValue(dialog) === "none")
                 event.preventDefault();
-            }
         };
     }
-    /**
-     * Create backdrop click handler
-     * @param dialog - Target dialog element
-     * @returns Event handler function
-     */
+    /** Creates a backdrop-click handler for the given dialog. */
     function createClickHandler(dialog) {
         return function handleClick(event) {
-            // Only handle clicks on the dialog element itself (backdrop area)
             if (event.target !== dialog)
+                return; // ignore inner clicks
+            if (getClosedByValue(dialog) !== "any")
                 return;
-            const closedBy = getClosedByValue(dialog);
-            if (closedBy === "any") {
-                // Detect clicks on ::backdrop pseudo-element
-                const rect = dialog.getBoundingClientRect();
-                const clickedInDialog = rect.top <= event.clientY &&
-                    event.clientY <= rect.bottom &&
-                    rect.left <= event.clientX &&
-                    event.clientX <= rect.right;
-                if (!clickedInDialog) {
-                    dialog.close();
-                }
-            }
+            const rect = dialog.getBoundingClientRect();
+            const clickedInside = rect.top <= event.clientY &&
+                event.clientY <= rect.bottom &&
+                rect.left <= event.clientX &&
+                event.clientX <= rect.right;
+            if (!clickedInside)
+                dialog.close();
         };
     }
-    /**
-     * Create cancel event handler
-     * @param dialog - Target dialog element
-     * @returns Event handler function
-     */
+    /** Creates a cancel-event handler for the given dialog. */
     function createCancelHandler(dialog) {
         return function handleCancel(event) {
-            const closedBy = getClosedByValue(dialog);
-            if (closedBy === "none") {
+            if (getClosedByValue(dialog) === "none")
                 event.preventDefault();
-            }
         };
     }
-    /**
-     * Setup event listeners
-     * @param dialog - Target dialog element
-     */
+    /** Attaches listeners and stores them in WeakMap. */
     function setupEventListeners(dialog) {
-        // Remove existing listeners if any
-        removeEventListeners(dialog);
-        const handleEscape = createEscapeHandler(dialog);
-        const handleClick = createClickHandler(dialog);
-        const handleCancel = createCancelHandler(dialog);
-        // Register event listeners
-        document.addEventListener("keydown", handleEscape);
-        dialog.addEventListener("click", handleClick);
-        dialog.addEventListener("cancel", handleCancel);
-        // Store in WeakMap
-        dialogStates.set(dialog, {
-            handleEscape,
-            handleClick,
-            handleCancel,
-        });
+        removeEventListeners(dialog); // idempotent
+        const state = {
+            handleEscape: createEscapeHandler(dialog),
+            handleClick: createClickHandler(dialog),
+            handleCancel: createCancelHandler(dialog),
+        };
+        document.addEventListener("keydown", state.handleEscape);
+        dialog.addEventListener("click", state.handleClick);
+        dialog.addEventListener("cancel", state.handleCancel);
+        dialogStates.set(dialog, state);
     }
-    /**
-     * Remove event listeners
-     * @param dialog - Target dialog element
-     */
+    /** Detaches listeners and clears WeakMap entry. */
     function removeEventListeners(dialog) {
         const state = dialogStates.get(dialog);
         if (!state)
             return;
-        if (state.handleEscape) {
+        if (state.handleEscape)
             document.removeEventListener("keydown", state.handleEscape);
-        }
-        if (state.handleClick) {
+        if (state.handleClick)
             dialog.removeEventListener("click", state.handleClick);
-        }
-        if (state.handleCancel) {
+        if (state.handleCancel)
             dialog.removeEventListener("cancel", state.handleCancel);
-        }
         dialogStates.delete(dialog);
     }
-    // Override showModal() method
+    /* --------------------------------------------------------------- */
+    /*  Method overrides                                               */
+    /* --------------------------------------------------------------- */
     HTMLDialogElement.prototype.showModal = function () {
-        // Call original method
         originalShowModal.call(this);
-        // Setup event listeners only if closedby attribute is present
-        if (this.hasAttribute("closedby")) {
+        /**
+         * Guard: showModal() may fail (e.g. detached element).
+         * When it does, `open` is false and we must not attach listeners.
+         */
+        if (!this.open)
+            return;
+        if (this.hasAttribute("closedby"))
             setupEventListeners(this);
-        }
     };
-    // Override close() method
     HTMLDialogElement.prototype.close = function (returnValue) {
-        // Remove event listeners
         removeEventListeners(this);
-        // Call original method
         originalClose.call(this, returnValue);
     };
-    // Define closedBy property getter/setter
+    /* --------------------------------------------------------------- */
+    /*  closedBy property                                              */
+    /* --------------------------------------------------------------- */
     Object.defineProperty(HTMLDialogElement.prototype, "closedBy", {
-        get: function () {
+        get() {
             return getClosedByValue(this);
         },
-        set: function (value) {
+        set(value) {
             if (value === "any" || value === "closerequest" || value === "none") {
                 this.setAttribute("closedby", value);
             }
             else {
                 this.removeAttribute("closedby");
             }
-            // Update event listeners if dialog is open
+            /* Keep listeners in sync with current state */
             if (this.open) {
                 setupEventListeners(this);
+            }
+            else {
+                removeEventListeners(this); // ← added: avoid dangling listeners
             }
         },
         enumerable: true,
         configurable: true,
     });
-    // MutationObserver to watch for attribute changes
-    const observer = new MutationObserver((mutations) => {
+    /* --------------------------------------------------------------- */
+    /*  Observers                                                      */
+    /* --------------------------------------------------------------- */
+    /** Watches the closedby attribute on each <dialog>. */
+    const attrObserver = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
             if (mutation.type === "attributes" &&
                 mutation.attributeName === "closedby") {
@@ -189,42 +155,98 @@ export function apply() {
             }
         });
     });
-    // Initialize on DOMContentLoaded
+    /**
+     * Sets up MutationObserver for a given root (Document or ShadowRoot):
+     *   • attributes: watch closedby changes
+     *   • childList : attach / detach listeners for added or removed dialogs
+     */
+    function setupMutationObserver(root) {
+        /* Observe all existing dialogs in this root */
+        root.querySelectorAll("dialog").forEach((dialog) => {
+            attrObserver.observe(dialog, {
+                attributes: true,
+                attributeFilter: ["closedby"],
+            });
+        });
+        /* Watch for additions AND removals */
+        const rootObserver = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                /* Added nodes */
+                mutation.addedNodes.forEach((node) => {
+                    if (node instanceof HTMLDialogElement) {
+                        attrObserver.observe(node, {
+                            attributes: true,
+                            attributeFilter: ["closedby"],
+                        });
+                    }
+                    if (node instanceof Element) {
+                        node.querySelectorAll("dialog").forEach((dialog) => {
+                            attrObserver.observe(dialog, {
+                                attributes: true,
+                                attributeFilter: ["closedby"],
+                            });
+                        });
+                    }
+                });
+                /* Removed nodes → detach listeners to avoid leaks */
+                mutation.removedNodes.forEach((node) => {
+                    if (node instanceof HTMLDialogElement) {
+                        removeEventListeners(node);
+                    }
+                    if (node instanceof Element) {
+                        node.querySelectorAll("dialog").forEach((dialog) => {
+                            removeEventListeners(dialog);
+                        });
+                    }
+                });
+            });
+        });
+        const rootElement = root === document ? document.body : root;
+        rootObserver.observe(rootElement, {
+            childList: true,
+            subtree: true,
+        });
+    }
+    /**
+     * Finds ShadowRoots recursively under a given element.
+     */
+    function findShadowRoots(el) {
+        const roots = [];
+        if (el.shadowRoot)
+            roots.push(el.shadowRoot);
+        for (const child of Array.from(el.children)) {
+            roots.push(...findShadowRoots(child));
+        }
+        return roots;
+    }
+    /**
+     * Sets up observers for existing and future ShadowRoots.
+     */
+    function setupShadowRootObservation() {
+        /* Existing ShadowRoots */
+        if (document.body) {
+            findShadowRoots(document.body).forEach(setupMutationObserver);
+        }
+        /* Future ShadowRoots */
+        const originalAttachShadow = HTMLElement.prototype.attachShadow;
+        HTMLElement.prototype.attachShadow = function (init) {
+            const shadowRoot = originalAttachShadow.call(this, init);
+            setupMutationObserver(shadowRoot);
+            return shadowRoot;
+        };
+    }
+    /* --------------------------------------------------------------- */
+    /*  Initialize                                                     */
+    /* --------------------------------------------------------------- */
+    function init() {
+        setupMutationObserver(document);
+        setupShadowRootObservation();
+    }
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", init);
     }
     else {
         init();
     }
-    /**
-     * Initialize the polyfill
-     */
-    function init() {
-        // Observe all existing dialog elements
-        document.querySelectorAll("dialog").forEach((dialog) => {
-            observer.observe(dialog, {
-                attributes: true,
-                attributeFilter: ["closedby"],
-            });
-        });
-        // Observe newly added dialog elements
-        const bodyObserver = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                mutation.addedNodes.forEach((node) => {
-                    if (node instanceof HTMLDialogElement) {
-                        observer.observe(node, {
-                            attributes: true,
-                            attributeFilter: ["closedby"],
-                        });
-                    }
-                });
-            });
-        });
-        bodyObserver.observe(document.body, {
-            childList: true,
-            subtree: true,
-        });
-    }
-    // Mark as polyfilled
     polyfilled = true;
 }

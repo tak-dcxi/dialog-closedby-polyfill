@@ -17,8 +17,7 @@
   ],
   "scripts": {
     "build": "esbuild src/index.ts --bundle --format=esm --outfile=index.js",
-    "prepublishOnly": "npm run build",
-    "test": "echo \"Open test/index.html in a browser to test\""
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "dialog",

@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dialog closedBy Polyfill Test</title>
+    <style>
+      *,
+      ::before,
+      ::after {
+        box-sizing: border-box;
+        min-inline-size: 0;
+        margin: unset;
+      }
+
+      :where(dialog:not([open], [popover]), [popover]:not(:popover-open)) {
+        display: none !important;
+      }
+
+      :root {
+        --color-mine-shaft: #333;
+        --color-emperor: #555;
+        --color-iceberg: #d1ecf1;
+        --color-powder-blue: #bee5eb;
+        --color-deep-sea-green: #0c5460;
+        --color-wild-sand: #f5f5f5;
+        --color-azure-radiance: #007bff;
+        --color-punch: #dc3545;
+        --color-cardinal: #c82333;
+        --color-dove-gray: #666;
+        --color-athens-gray: #e9ecef;
+        --color-white: #fff;
+
+        color-scheme: only light;
+        background-color: var(--color-white);
+        color: var(--color-mine-shaft);
+        line-height: 1.6;
+        text-spacing-trim: trim-start;
+        text-autospace: normal;
+        word-break: initial;
+        line-break: strict;
+        overflow-wrap: anywhere;
+        hyphens: auto;
+        text-underline-offset: 0.3em;
+        scrollbar-gutter: stable;
+        interpolate-size: allow-keywords;
+        -webkit-font-smoothing: antialiased;
+
+        &:lang(ja) {
+          font-kerning: none;
+        }
+
+        &:lang(en) {
+          font-kerning: normal;
+          text-wrap: pretty;
+        }
+
+        &:has(:modal) {
+          overflow: clip;
+        }
+      }
+
+      body {
+        display: block grid;
+        row-gap: 24px;
+        box-sizing: initial;
+        max-inline-size: 800px;
+        margin-inline: auto;
+        padding: 24px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
+      }
+
+      .HeadingTop {
+        font-size: 2rem;
+      }
+
+      .Information {
+        display: block grid;
+        row-gap: 1cap;
+        padding: 2ch;
+        border: 1px solid var(--color-powder-blue);
+        border-radius: 4px;
+        background-color: var(--color-iceberg);
+        color: var(--color-deep-sea-green);
+      }
+
+      .Information__Heading {
+        font-size: 1.25rem;
+      }
+
+      .Information__List {
+        display: block grid;
+        row-gap: 1ex;
+      }
+
+      .Section {
+        display: block grid;
+        row-gap: 1cap;
+        padding: 2ch;
+        border-radius: 8px;
+        background-color: var(--color-wild-sand);
+      }
+
+      .Section__Heading {
+        color: var(--color-emperor);
+        font-size: 1.25rem;
+      }
+
+      .AppDialog {
+        --_max-width: 560px;
+        --_gutter: 32px;
+
+        position: fixed;
+        inset: 0;
+        overscroll-behavior-block: contain;
+        max-inline-size: calc(
+          min(var(--_max-width), 100%) - var(--_gutter) * 2
+        );
+        max-block-size: calc(100% - var(--_gutter) * 2);
+        margin: revert;
+        padding: 32px;
+        border: unset;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px oklch(from black l c h / 0.1);
+        background-color: var(--color-white);
+        color: var(--color-dove-gray);
+        outline: none;
+        transition-duration: 300ms;
+        transition-property: display, overlay, opacity;
+        transition-timing-function: ease-in-out;
+        transition-behavior: allow-discrete;
+
+        &::backdrop {
+          background-color: oklch(from black l c h / 0.5);
+          transition-duration: inherit;
+          transition-property: opacity;
+          transition-timing-function: inherit;
+        }
+
+        &:modal,
+        &:modal::backdrop {
+          @starting-style {
+            opacity: 0;
+          }
+        }
+
+        &:not(:modal),
+        &:not(:modal)::backdrop {
+          opacity: 0;
+        }
+      }
+
+      .AppDialog__Layout {
+        display: block grid;
+        row-gap: 1cap;
+      }
+
+      .AppDialog__Heading {
+        font-size: 1.5rem;
+      }
+
+      .AppDialog__ButtonGroup {
+        display: block flex;
+        gap: 1ch;
+
+        & > * {
+          flex-grow: 1;
+        }
+      }
+
+      .BaseButton {
+        --_foreground-default: var(--color-azure-radiance);
+        --_foreground-hover: var(--color-white);
+        --_background-default: var(--color-white);
+        --_background-hover: var(--color-azure-radiance);
+        --_border-color-default: var(--color-azure-radiance);
+        --_border-color-hover: var(--color-azure-radiance);
+
+        padding-block: 1ch;
+        padding-inline: 2ch;
+        border: 2px solid var(--_border-color-default);
+        border-radius: 4px;
+        background-color: var(--_background-default);
+        color: var(--_foreground-default);
+        font-size: 1rem;
+        cursor: pointer;
+        touch-action: manipulation;
+        transition-duration: 300ms;
+        transition-property: background-color, color, border-color;
+
+        &:focus-visible {
+          border-color: var(--_border-color-hover);
+          background-color: var(--_background-hover);
+          color: var(--_foreground-hover);
+        }
+
+        &:is(:any-link, :enabled):hover {
+          @media (any-hover: hover) {
+            border-color: var(--_border-color-hover);
+            background-color: var(--_background-hover);
+            color: var(--_foreground-hover);
+          }
+        }
+
+        &[command="close"] {
+          --_foreground-default: var(--color-white);
+          --_foreground-hover: var(--color-white);
+          --_background-default: var(--color-punch);
+          --_background-hover: var(--color-cardinal);
+          --_border-color-default: var(--color-punch);
+          --_border-color-hover: var(--color-cardinal);
+        }
+      }
+
+      .BaseStatus {
+        padding: 1ch;
+        border-radius: 4px;
+        background-color: var(--color-athens-gray);
+        font-family: monospace;
+        font-size: 0.875rem;
+      }
+
+      code {
+        padding-block: 1ex;
+        padding-inline: 1ch;
+        border-radius: 3px;
+        background-color: var(--color-athens-gray);
+        font-family: monospace;
+      }
+    </style>
+    <script type="module" async>
+      import {
+        isSupported,
+        apply,
+      } from "https://unpkg.com/invokers-polyfill@latest/invoker.js";
+      if (!isSupported()) apply();
+    </script>
+    <!-- Load the polyfill -->
+    <script src="./index.js" type="module"></script>
+    <script type="module">
+      // Import the functions from the polyfill
+      import { isSupported } from "./index.js";
+
+      // Update dialog open/close status
+      function updateStatus(dialogId, statusId) {
+        const dialog = document.getElementById(dialogId);
+        const status = document.getElementById(statusId);
+        if (dialog.open) {
+          status.textContent = "Status: Open";
+          status.style.backgroundColor = "#d4edda";
+          status.style.color = "#155724";
+        } else {
+          status.textContent = "Status: Closed";
+          status.style.backgroundColor = "#e9ecef";
+          status.style.color = "#495057";
+        }
+      }
+
+      // Monitor dialog state changes only (no manual event handling)
+      ["dialog1", "dialog2", "dialog3", "dialog4"].forEach((id, index) => {
+        const dialog = document.getElementById(id);
+        const statusId = `status${index + 1}`;
+
+        // Monitor dialog state changes
+        dialog.addEventListener("close", () => {
+          updateStatus(id, statusId);
+          console.log(`${id} closed`);
+        });
+
+        // Monitor when dialog opens (via MutationObserver or polling)
+        const observer = new MutationObserver(() => {
+          updateStatus(id, statusId);
+        });
+
+        observer.observe(dialog, {
+          attributes: true,
+          attributeFilter: ["open"],
+        });
+
+        dialog.addEventListener("cancel", (e) => {
+          console.log(`${id} cancel event fired`);
+          // For closedby="none", the polyfill will preventDefault
+        });
+      });
+
+      // Test 4: Dynamically change closedBy attribute
+      window.changeClosedBy = function (value) {
+        const dialog = document.getElementById("dialog4");
+        dialog.setAttribute("closedby", value);
+        document.getElementById(
+          "currentValue"
+        ).textContent = `closedby="${value}"`;
+        console.log(`Changed closedby attribute to "${value}"`);
+      };
+
+      // Check for native support
+      const hasNativeSupport = isSupported();
+      console.log(
+        `Native closedBy support: ${
+          hasNativeSupport ? "Yes" : "No (using polyfill)"
+        }`
+      );
+
+      // Also test the detection directly
+      const directCheck = "closedBy" in HTMLDialogElement.prototype;
+      console.log(`Direct prototype check: ${directCheck ? "Yes" : "No"}`);
+    </script>
+  </head>
+  <body>
+    <h1 class="HeadingTop">Dialog closedBy Polyfill Test</h1>
+
+    <section class="Information">
+      <h2 class="Information__Heading">Test Instructions:</h2>
+      <ul class="Information__List">
+        <li>
+          Open each dialog and test closing behavior with ESC key and backdrop
+          clicks
+        </li>
+        <li>
+          <code>closedby="any"</code>: Closes with ESC key, backdrop click, and
+          close button
+        </li>
+        <li>
+          <code>closedby="closerequest"</code>: Closes with ESC key and close
+          button only
+        </li>
+        <li><code>closedby="none"</code>: Closes with close button only</li>
+      </ul>
+    </section>
+
+    <!-- Test 1: closedby="any" -->
+    <section class="Section">
+      <h2 class="Section__Heading">
+        Test 1: closedby="any" (default behavior)
+      </h2>
+      <p>Can be closed with ESC key, backdrop click, and close button.</p>
+      <div class="Section__Button">
+        <button
+          type="button"
+          class="BaseButton"
+          id="openDialog1"
+          commandfor="dialog1"
+          command="show-modal"
+        >
+          Open Dialog
+        </button>
+      </div>
+      <p class="BaseStatus" id="status1">Status: Closed</p>
+    </section>
+
+    <dialog
+      class="AppDialog"
+      id="dialog1"
+      closedby="any"
+      aria-labelledby="dialog1-title"
+      autofocus
+    >
+      <div class="AppDialog__Layout">
+        <h1 id="dialog1-title" class="AppDialog__Heading">
+          Dialog with closedby="any"
+        </h1>
+        <p>This dialog can be closed by:</p>
+        <ul>
+          <li>Pressing ESC key</li>
+          <li>Clicking the backdrop</li>
+          <li>Clicking the close button</li>
+        </ul>
+        <button
+          type="button"
+          class="BaseButton"
+          commandfor="dialog1"
+          command="close"
+        >
+          Close
+        </button>
+      </div>
+    </dialog>
+
+    <!-- Test 2: closedby="closerequest" -->
+    <section class="Section">
+      <h2 class="Section__Heading">Test 2: closedby="closerequest"</h2>
+      <p>
+        Can be closed with ESC key and close button only. Backdrop clicks are
+        ignored.
+      </p>
+      <div class="Section__Button">
+        <button
+          type="button"
+          class="BaseButton"
+          id="openDialog2"
+          commandfor="dialog2"
+          command="show-modal"
+        >
+          Open Dialog
+        </button>
+      </div>
+      <p class="BaseStatus" id="status2">Status: Closed</p>
+    </section>
+
+    <dialog
+      class="AppDialog"
+      id="dialog2"
+      closedby="closerequest"
+      aria-labelledby="dialog2-title"
+      autofocus
+    >
+      <div class="AppDialog__Layout">
+        <h1 id="dialog2-title" class="AppDialog__Heading">
+          Dialog with closedby="closerequest"
+        </h1>
+        <p>This dialog can be closed by:</p>
+        <ul>
+          <li>Pressing ESC key ✓</li>
+          <li>Clicking the backdrop ✗</li>
+          <li>Clicking the close button ✓</li>
+        </ul>
+        <button
+          type="button"
+          class="BaseButton"
+          commandfor="dialog2"
+          command="close"
+        >
+          Close
+        </button>
+      </div>
+    </dialog>
+
+    <!-- Test 3: closedby="none" -->
+    <section class="Section">
+      <h2 class="Section__Heading">Test 3: closedby="none"</h2>
+      <p>
+        Can only be closed with the close button. ESC key and backdrop clicks
+        are ignored.
+      </p>
+      <div class="Section__Button">
+        <button
+          type="button"
+          class="BaseButton"
+          id="openDialog3"
+          commandfor="dialog3"
+          command="show-modal"
+        >
+          Open Dialog
+        </button>
+      </div>
+      <p class="BaseStatus" id="status3">Status: Closed</p>
+    </section>
+
+    <dialog
+      class="AppDialog"
+      id="dialog3"
+      closedby="none"
+      aria-labelledby="dialog3-title"
+      autofocus
+    >
+      <div class="AppDialog__Layout">
+        <h1 id="dialog3-title" class="AppDialog__Heading">
+          Dialog with closedby="none"
+        </h1>
+        <p>This dialog can be closed by:</p>
+        <ul>
+          <li>Pressing ESC key ✗</li>
+          <li>Clicking the backdrop ✗</li>
+          <li>Clicking the close button ✓</li>
+        </ul>
+        <button
+          type="button"
+          class="BaseButton"
+          commandfor="dialog3"
+          command="close"
+        >
+          Close
+        </button>
+      </div>
+    </dialog>
+
+    <!-- Test 4: Dynamic attribute changes -->
+    <section class="Section">
+      <h2 class="Section__Heading">Test 4: Dynamic Attribute Changes</h2>
+      <p>You can change the closedBy attribute while the dialog is open.</p>
+      <div class="Section__Button">
+        <button
+          type="button"
+          class="BaseButton"
+          id="openDialog4"
+          commandfor="dialog4"
+          command="show-modal"
+        >
+          Open Dialog
+        </button>
+      </div>
+      <p class="BaseStatus" id="status4">Status: Closed</p>
+    </section>
+
+    <dialog
+      class="AppDialog"
+      id="dialog4"
+      closedby="any"
+      aria-labelledby="dialog4-title"
+      autofocus
+    >
+      <div class="AppDialog__Layout">
+        <h1 id="dialog4-title" class="AppDialog__Heading">
+          Dialog with Dynamic closedBy
+        </h1>
+        <p>Current setting: <code id="currentValue">closedby="any"</code></p>
+        <div class="AppDialog__ButtonGroup">
+          <button
+            type="button"
+            class="BaseButton"
+            onclick="changeClosedBy('any')"
+          >
+            Set to any
+          </button>
+          <button
+            type="button"
+            class="BaseButton"
+            onclick="changeClosedBy('closerequest')"
+          >
+            Set to closerequest
+          </button>
+          <button
+            type="button"
+            class="BaseButton"
+            onclick="changeClosedBy('none')"
+          >
+            Set to none
+          </button>
+        </div>
+        <hr />
+        <button
+          type="button"
+          class="BaseButton"
+          commandfor="dialog4"
+          command="close"
+        >
+          Close
+        </button>
+      </div>
+    </dialog>
+  </body>
+</html>

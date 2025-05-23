@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2018",
+    "module": "ES2022",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "downlevelIteration": true,
+    "outDir": "./",
+    "rootDir": "./src",
+    "lib": ["DOM", "ES2022"]
+  },
+  "include": ["src/index.ts"],
+  "exclude": ["node_modules", "**/*.test.*"]
+}

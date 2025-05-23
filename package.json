@@ -1,0 +1,45 @@
+{
+  "name": "dialog-closedby-polyfill",
+  "version": "1.0.0",
+  "description": "Polyfill for the HTMLDialogElement closedBy attribute",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "require": "./index.js"
+    }
+  },
+  "files": [
+    "index.js",
+    "index.d.ts"
+  ],
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --format=esm --outfile=index.js",
+    "prepublishOnly": "npm run build",
+    "test": "echo \"Open test/index.html in a browser to test\""
+  },
+  "keywords": [
+    "dialog",
+    "closedby",
+    "polyfill",
+    "html5",
+    "web-components"
+  ],
+  "author": "Takahiro Arai (https://www.tak-dcxi.com)",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "esbuild": "^0.25.4",
+    "typescript": "^5.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tak-dcxi/dialog-closedby-polyfill.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tak-dcxi/dialog-closedby-polyfill/issues"
+  },
+  "homepage": "https://github.com/tak-dcxi/dialog-closedby-polyfill#readme"
+}

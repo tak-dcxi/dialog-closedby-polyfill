@@ -62,6 +62,10 @@ Or include it via CDN:
 </script>
 ```
 
+## Demo
+
+https://tak-dcxi.github.io/github-pages-demo/closedby.html
+
 ## How it works
 
 The `closedby` attribute controls how a modal dialog can be dismissed:
@@ -83,8 +87,13 @@ The dialog can be closed by:
 - Calling the `close()` method
 
 ```html
-<dialog id="dialog-any" closedby="any">
-  <h1>any</h1>
+<dialog
+  id="dialog-any"
+  closedby="any"
+  aria-labelledby="dialog-any-title"
+  autofocus
+>
+  <h1 id="dialog-any-title">any</h1>
   <p>This dialog can be closed in any way</p>
   <button type="button" commandfor="dialog-any" command="close">Close</button>
 </dialog>
@@ -99,8 +108,13 @@ The dialog can be closed by:
 - ❌ Clicking the backdrop (disabled)
 
 ```html
-<dialog id="dialog-closerequest" closedby="closerequest">
-  <h1>closerequest</h1>
+<dialog
+  id="dialog-closerequest"
+  closedby="closerequest"
+  aria-labelledby="dialog-closerequest-title"
+  autofocus
+>
+  <h1 id="dialog-closerequest-title">closerequest</h1>
   <p>This dialog cannot be closed by clicking outside</p>
   <button type="button" commandfor="dialog-closerequest" command="close">
     Close
@@ -117,8 +131,13 @@ The dialog can only be closed by:
 - ❌ Clicking the backdrop (disabled)
 
 ```html
-<dialog id="dialog-none" closedby="none">
-  <h1>none</h1>
+<dialog
+  id="dialog-none"
+  closedby="none"
+  aria-labelledby="dialog-none-title"
+  autofocus
+>
+  <h1 id="dialog-none-title">none</h1>
   <p>This dialog can only be closed programmatically</p>
   <button type="button" commandfor="dialog-none" command="close">Close</button>
 </dialog>
@@ -218,24 +237,6 @@ TypeScript definitions are included. The polyfill extends the `HTMLDialogElement
 interface HTMLDialogElement {
   closedBy: "any" | "closerequest" | "none";
 }
-```
-
-## Testing
-
-To test the polyfill, open `example.html` in your browser:
-
-```bash
-# Clone the repository
-git clone https://github.com/tak-dcxi/dialog-closedby-polyfill
-
-# Install dependencies
-npm install
-
-# Build the project
-npm run build
-
-# Open example.html in your browser
-open example.html
 ```
 
 ## Implementation Details

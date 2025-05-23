@@ -36,7 +36,7 @@ require("dialog-closedby-polyfill");
 If you need more control over when the polyfill is applied:
 
 ```javascript
-import { apply, isSupported } from "dialog-closedby-polyfill/closedby.js";
+import { apply, isSupported } from "dialog-closedby-polyfill";
 
 if (!isSupported()) {
   apply();
@@ -57,7 +57,7 @@ Or include it via CDN:
   import {
     isSupported,
     apply,
-  } from "https://cdn.jsdelivr.net/npm/dialog-closedby-polyfill/closedby.js";
+  } from "https://cdn.jsdelivr.net/npm/dialog-closedby-polyfill/index.js";
   if (!isSupported()) apply();
 </script>
 ```
@@ -181,7 +181,7 @@ This polyfill works in all browsers that support the native `<dialog>` element.
 Check if the browser natively supports the `closedby` attribute.
 
 ```javascript
-import { isSupported } from "dialog-closedby-polyfill/closedby.js";
+import { isSupported } from "dialog-closedby-polyfill";
 
 if (isSupported()) {
   console.log("Native closedby support available!");
@@ -193,7 +193,7 @@ if (isSupported()) {
 Check if the polyfill has already been applied.
 
 ```javascript
-import { isPolyfilled } from "dialog-closedby-polyfill/closedby.js";
+import { isPolyfilled } from "dialog-closedby-polyfill";
 
 if (isPolyfilled()) {
   console.log("Polyfill has been applied");
@@ -205,7 +205,7 @@ if (isPolyfilled()) {
 Manually apply the polyfill. This is called automatically when importing the main module.
 
 ```javascript
-import { apply } from "dialog-closedby-polyfill/closedby.js";
+import { apply } from "dialog-closedby-polyfill";
 
 apply(); // Apply the polyfill
 ```

@@ -3,27 +3,20 @@
   "version": "1.0.0",
   "description": "Polyfill for the HTMLDialogElement closedBy attribute",
   "main": "index.js",
-  "types": "closedby.d.ts",
+  "types": "index.d.ts",
   "exports": {
     ".": {
+      "types": "./index.d.ts",
       "import": "./index.js",
-      "require": "./index.js",
-      "types": "./index-fn.d.ts"
-    },
-    "./closedby.js": {
-      "import": "./closedby.js",
-      "require": "./closedby.js",
-      "types": "./closedby.d.ts"
+      "require": "./index.js"
     }
   },
   "files": [
     "index.js",
-    "index-fn.d.ts",
-    "closedby.js",
-    "closedby.d.ts"
+    "index.d.ts"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "esbuild src/index.ts --bundle --format=esm --outfile=index.js",
     "prepublishOnly": "npm run build",
     "test": "echo \"Open test/index.html in a browser to test\""
   },
@@ -38,6 +31,7 @@
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "esbuild": "^0.25.4",
     "typescript": "^5.0.0"
   },
   "repository": {

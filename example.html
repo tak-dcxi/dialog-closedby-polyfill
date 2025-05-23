@@ -236,6 +236,76 @@
       } from "https://unpkg.com/invokers-polyfill@latest/invoker.js";
       if (!isSupported()) apply();
     </script>
+    <!-- Load the polyfill -->
+    <script src="./index.js" type="module"></script>
+    <script type="module">
+      // Import the functions from the polyfill
+      import { isSupported } from "./index.js";
+
+      // Update dialog open/close status
+      function updateStatus(dialogId, statusId) {
+        const dialog = document.getElementById(dialogId);
+        const status = document.getElementById(statusId);
+        if (dialog.open) {
+          status.textContent = "Status: Open";
+          status.style.backgroundColor = "#d4edda";
+          status.style.color = "#155724";
+        } else {
+          status.textContent = "Status: Closed";
+          status.style.backgroundColor = "#e9ecef";
+          status.style.color = "#495057";
+        }
+      }
+
+      // Monitor dialog state changes only (no manual event handling)
+      ["dialog1", "dialog2", "dialog3", "dialog4"].forEach((id, index) => {
+        const dialog = document.getElementById(id);
+        const statusId = `status${index + 1}`;
+
+        // Monitor dialog state changes
+        dialog.addEventListener("close", () => {
+          updateStatus(id, statusId);
+          console.log(`${id} closed`);
+        });
+
+        // Monitor when dialog opens (via MutationObserver or polling)
+        const observer = new MutationObserver(() => {
+          updateStatus(id, statusId);
+        });
+
+        observer.observe(dialog, {
+          attributes: true,
+          attributeFilter: ["open"],
+        });
+
+        dialog.addEventListener("cancel", (e) => {
+          console.log(`${id} cancel event fired`);
+          // For closedby="none", the polyfill will preventDefault
+        });
+      });
+
+      // Test 4: Dynamically change closedBy attribute
+      window.changeClosedBy = function (value) {
+        const dialog = document.getElementById("dialog4");
+        dialog.setAttribute("closedby", value);
+        document.getElementById(
+          "currentValue"
+        ).textContent = `closedby="${value}"`;
+        console.log(`Changed closedby attribute to "${value}"`);
+      };
+
+      // Check for native support
+      const hasNativeSupport = isSupported();
+      console.log(
+        `Native closedBy support: ${
+          hasNativeSupport ? "Yes" : "No (using polyfill)"
+        }`
+      );
+
+      // Also test the detection directly
+      const directCheck = "closedBy" in HTMLDialogElement.prototype;
+      console.log(`Direct prototype check: ${directCheck ? "Yes" : "No"}`);
+    </script>
   </head>
   <body>
     <h1 class="HeadingTop">Dialog closedBy Polyfill Test</h1>
@@ -469,77 +539,5 @@
         </button>
       </div>
     </dialog>
-
-    <!-- Load the polyfill -->
-    <script src="./index.js" type="module"></script>
-
-    <script type="module">
-      // Import the functions from the polyfill
-      import { isSupported } from "./closedby.js";
-
-      // Update dialog open/close status
-      function updateStatus(dialogId, statusId) {
-        const dialog = document.getElementById(dialogId);
-        const status = document.getElementById(statusId);
-        if (dialog.open) {
-          status.textContent = "Status: Open";
-          status.style.backgroundColor = "#d4edda";
-          status.style.color = "#155724";
-        } else {
-          status.textContent = "Status: Closed";
-          status.style.backgroundColor = "#e9ecef";
-          status.style.color = "#495057";
-        }
-      }
-
-      // Monitor dialog state changes only (no manual event handling)
-      ["dialog1", "dialog2", "dialog3", "dialog4"].forEach((id, index) => {
-        const dialog = document.getElementById(id);
-        const statusId = `status${index + 1}`;
-
-        // Monitor dialog state changes
-        dialog.addEventListener("close", () => {
-          updateStatus(id, statusId);
-          console.log(`${id} closed`);
-        });
-
-        // Monitor when dialog opens (via MutationObserver or polling)
-        const observer = new MutationObserver(() => {
-          updateStatus(id, statusId);
-        });
-
-        observer.observe(dialog, {
-          attributes: true,
-          attributeFilter: ["open"],
-        });
-
-        dialog.addEventListener("cancel", (e) => {
-          console.log(`${id} cancel event fired`);
-          // For closedby="none", the polyfill will preventDefault
-        });
-      });
-
-      // Test 4: Dynamically change closedBy attribute
-      window.changeClosedBy = function (value) {
-        const dialog = document.getElementById("dialog4");
-        dialog.setAttribute("closedby", value);
-        document.getElementById(
-          "currentValue"
-        ).textContent = `closedby="${value}"`;
-        console.log(`Changed closedby attribute to "${value}"`);
-      };
-
-      // Check for native support
-      const hasNativeSupport = isSupported();
-      console.log(
-        `Native closedBy support: ${
-          hasNativeSupport ? "Yes" : "No (using polyfill)"
-        }`
-      );
-
-      // Also test the detection directly
-      const directCheck = "closedBy" in HTMLDialogElement.prototype;
-      console.log(`Direct prototype check: ${directCheck ? "Yes" : "No"}`);
-    </script>
   </body>
 </html>

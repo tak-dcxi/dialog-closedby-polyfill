@@ -7,11 +7,22 @@ function getClosedByValue(dialog) {
 var activeDialogs = /* @__PURE__ */ new Set();
 function documentEscapeHandler(event) {
   if (event.key !== "Escape" || activeDialogs.size === 0) return;
-  for (const dlg of activeDialogs) {
-    if (getClosedByValue(dlg) === "none") {
-      event.preventDefault();
+  let shouldPreventDefault = false;
+  let hasClosableDialog = false;
+  const dialogsArray = Array.from(activeDialogs).reverse();
+  for (const dialog of dialogsArray) {
+    const closedBy = getClosedByValue(dialog);
+    if (closedBy === "none") {
+      shouldPreventDefault = true;
+      break;
+    } else if (closedBy === "any" || closedBy === "closerequest") {
+      dialog.close();
+      hasClosableDialog = true;
       break;
     }
+  }
+  if (shouldPreventDefault || hasClosableDialog) {
+    event.preventDefault();
   }
 }
 document.addEventListener("keydown", documentEscapeHandler);

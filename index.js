@@ -4,6 +4,10 @@ function getClosedByValue(dialog) {
   const raw = dialog.getAttribute("closedby");
   return raw === "closerequest" || raw === "none" ? raw : "any";
 }
+function isTopMost(dialog) {
+  const stack = Array.from(activeDialogs);
+  return stack[stack.length - 1] === dialog;
+}
 var activeDialogs = /* @__PURE__ */ new Set();
 function documentEscapeHandler(event) {
   if (event.key !== "Escape" || activeDialogs.size === 0) return;
@@ -15,7 +19,8 @@ function documentEscapeHandler(event) {
     if (closedBy === "none") {
       shouldPreventDefault = true;
       break;
-    } else if (closedBy === "any" || closedBy === "closerequest") {
+    }
+    if (closedBy === "any" || closedBy === "closerequest") {
       dialog.close();
       hasClosableDialog = true;
       break;
@@ -26,6 +31,17 @@ function documentEscapeHandler(event) {
   }
 }
 document.addEventListener("keydown", documentEscapeHandler);
+function createLightDismissHandler(dialog) {
+  return function handleDocumentClick(event) {
+    if (!isTopMost(dialog) || getClosedByValue(dialog) !== "any" || !dialog.open) {
+      return;
+    }
+    const rect = dialog.getBoundingClientRect();
+    const { clientX: x, clientY: y } = event;
+    const inside = rect.top <= y && y <= rect.bottom && rect.left <= x && x <= rect.right;
+    if (!inside) dialog.close();
+  };
+}
 function createClickHandler(dialog) {
   return function handleClick(event) {
     if (event.target !== dialog) return;
@@ -45,12 +61,15 @@ function attachDialog(dialog) {
   const state = {
     handleEscape: documentEscapeHandler,
     handleClick: createClickHandler(dialog),
+    handleDocClick: createLightDismissHandler(dialog),
+    // NEW
     handleCancel: createCancelHandler(dialog),
     attrObserver: new MutationObserver(() => {
     })
   };
   dialog.addEventListener("click", state.handleClick);
   dialog.addEventListener("cancel", state.handleCancel);
+  document.addEventListener("click", state.handleDocClick, true);
   state.attrObserver.observe(dialog, {
     attributes: true,
     attributeFilter: ["closedby"]
@@ -63,6 +82,7 @@ function detachDialog(dialog) {
   if (!state) return;
   dialog.removeEventListener("click", state.handleClick);
   dialog.removeEventListener("cancel", state.handleCancel);
+  document.removeEventListener("click", state.handleDocClick, true);
   state.attrObserver.disconnect();
   activeDialogs.delete(dialog);
   dialogStates.delete(dialog);

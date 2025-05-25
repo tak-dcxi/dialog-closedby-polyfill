@@ -1,6 +1,6 @@
 import { ClosedBy, DialogListeners } from "./types.js";
 
-/** Maps every open `<dialog>` to its active {@link DialogListeners}. */
+/** Maps every open `<dialog>` element to its active listeners. */
 const dialogStates = new WeakMap<HTMLDialogElement, DialogListeners>();
 
 /* -------------------------------------------------------------------------- */
@@ -8,23 +8,41 @@ const dialogStates = new WeakMap<HTMLDialogElement, DialogListeners>();
 /* -------------------------------------------------------------------------- */
 
 /**
- * Returns the normalized *closedBy* semantic for a given dialog.
+ * Normalizes the value of the `closedby` attribute.
  *
- * @remarks
- *  The attribute is resolved at call‑time so that live mutations are respected
- *  without reattaching handlers.
+ * @param dialog - The dialog whose attribute is inspected.
+ * @returns `"any"`, `"closerequest"`, or `"none"`.
  */
 function getClosedByValue(dialog: HTMLDialogElement): ClosedBy {
   const raw = dialog.getAttribute("closedby");
   return raw === "closerequest" || raw === "none" ? raw : "any";
 }
 
+/**
+ * NOTE:
+ * By design, **only the top-most modal dialog in the pending-dialog stack
+ * should receive user input (pointer and keyboard events)**.
+ * Lower-layer dialogs are effectively inert until they become top-most.
+ * The `isTopMost()` helper enforces this rule wherever user actions need
+ * to be filtered.
+ */
+
+/**
+ * Returns `true` if the dialog is the top-most (last added) modal in the stack.
+ *
+ * @param dialog - Dialog candidate.
+ */
+function isTopMost(dialog: HTMLDialogElement): boolean {
+  const stack = Array.from(activeDialogs);
+  return stack[stack.length - 1] === dialog;
+}
+
 /* -------------------------------------------------------------------------- */
-/* Document‑level <kbd>Escape</kbd> delegation                                 */
+/* Document-level <kbd>Escape</kbd> delegation                                */
 /* -------------------------------------------------------------------------- */
 
-/** Currently open modal dialogs that have `closedby` present. */
-let activeDialogs = new Set<HTMLDialogElement>();
+/** Set of currently open modal dialogs that define `closedby`. */
+const activeDialogs = new Set<HTMLDialogElement>();
 
 /**
  * Global `keydown` handler attached **once** to <kbd>document</kbd> to mirror
@@ -57,7 +75,9 @@ function documentEscapeHandler(event: KeyboardEvent): void {
       // Dialog prevents closure - stop processing and prevent default
       shouldPreventDefault = true;
       break;
-    } else if (closedBy === "any" || closedBy === "closerequest") {
+    }
+
+    if (closedBy === "any" || closedBy === "closerequest") {
       // Close only the topmost closable dialog and stop processing
       dialog.close();
       hasClosableDialog = true;
@@ -75,21 +95,52 @@ function documentEscapeHandler(event: KeyboardEvent): void {
 document.addEventListener("keydown", documentEscapeHandler);
 
 /* -------------------------------------------------------------------------- */
-/* Factory helpers for per‑dialog handlers                                    */
+/* Light-dismiss handler for hidden backdrops                                 */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Generates a click handler that closes the dialog when the user clicks the
- * *backdrop* **and** `closedBy` is set to `"any"`.
+ * Creates a document-wide click handler that emulates backdrop clicks.
+ *
+ * @param dialog - The dialog to be controlled.
+ */
+function createLightDismissHandler(dialog: HTMLDialogElement) {
+  /**
+   * Handles clicks captured at the document level.
+   *
+   * @param event - Pointer event.
+   */
+  return function handleDocumentClick(event: MouseEvent): void {
+    // Only the top-most, open dialog with closedby="any" can be dismissed.
+    if (
+      !isTopMost(dialog) ||
+      getClosedByValue(dialog) !== "any" ||
+      !dialog.open
+    ) {
+      return;
+    }
+
+    const rect = dialog.getBoundingClientRect();
+    const { clientX: x, clientY: y } = event;
+    const inside =
+      rect.top <= y && y <= rect.bottom && rect.left <= x && x <= rect.right;
+
+    if (!inside) dialog.close();
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* cancel / click handlers bound per dialog                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Generates a click handler that closes the dialog when the backdrop
+ * (the element itself) is clicked and `closedby="any"`.
+ *
+ * @param dialog - Host dialog element.
  */
 function createClickHandler(dialog: HTMLDialogElement) {
-  /**
-   * @param event – Pointer event dispatched on the dialog element.
-   */
   return function handleClick(event: MouseEvent): void {
-    // Ignore clicks that originate from inside the dialog box.
     if (event.target !== dialog) return;
-
     if (getClosedByValue(dialog) !== "any") return;
 
     const rect = dialog.getBoundingClientRect();
@@ -103,7 +154,11 @@ function createClickHandler(dialog: HTMLDialogElement) {
   };
 }
 
-/** Creates a `cancel` event handler that respects the `closedBy` mode. */
+/**
+ * Generates a `cancel` handler (triggered by ESC) that respects `closedby`.
+ *
+ * @param dialog - Host dialog element.
+ */
 function createCancelHandler(dialog: HTMLDialogElement) {
   return function handleCancel(event: Event): void {
     if (getClosedByValue(dialog) === "none") event.preventDefault();
@@ -111,13 +166,16 @@ function createCancelHandler(dialog: HTMLDialogElement) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Public API: attach / detach                                                */
+/* Public API                                                                 */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Installs all event listeners and attribute observers required for a single
- * `<dialog>`. The function is idempotent: calling it repeatedly on the same
- * element is a no‑op after the first execution.
+ * Attaches all required listeners to a `<dialog>` element.
+ *
+ * @param dialog - Target dialog element.
+ *
+ * @remarks
+ * The function is idempotent; subsequent calls on the same element are no-ops.
  */
 export function attachDialog(dialog: HTMLDialogElement): void {
   if (dialogStates.has(dialog)) return; // already initialized
@@ -125,14 +183,19 @@ export function attachDialog(dialog: HTMLDialogElement): void {
   const state: DialogListeners = {
     handleEscape: documentEscapeHandler,
     handleClick: createClickHandler(dialog),
+    handleDocClick: createLightDismissHandler(dialog),
     handleCancel: createCancelHandler(dialog),
     attrObserver: new MutationObserver(() => {
-      /* noop – see remarks below */
+      /* intentionally empty: reactivity handled via getClosedByValue() */
     }),
   };
 
   dialog.addEventListener("click", state.handleClick);
   dialog.addEventListener("cancel", state.handleCancel);
+
+  // Capture phase to avoid stopPropagation() in frameworks
+  document.addEventListener("click", state.handleDocClick, true);
+
   state.attrObserver.observe(dialog, {
     attributes: true,
     attributeFilter: ["closedby"],
@@ -143,9 +206,9 @@ export function attachDialog(dialog: HTMLDialogElement): void {
 }
 
 /**
- * Removes *all* runtime artefact introduced by {@link attachDialog}. This is
- * called from the polyfilled `close()` override **and** when a dialog node is
- * detached from the DOM tree by other means (MutationObserver).
+ * Removes every listener and observer previously installed by {@link attachDialog}.
+ *
+ * @param dialog - Dialog element being detached.
  */
 export function detachDialog(dialog: HTMLDialogElement): void {
   const state = dialogStates.get(dialog);
@@ -153,6 +216,7 @@ export function detachDialog(dialog: HTMLDialogElement): void {
 
   dialog.removeEventListener("click", state.handleClick);
   dialog.removeEventListener("cancel", state.handleCancel);
+  document.removeEventListener("click", state.handleDocClick, true);
   state.attrObserver.disconnect();
 
   activeDialogs.delete(dialog);

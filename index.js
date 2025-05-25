@@ -62,7 +62,6 @@ function attachDialog(dialog) {
     handleEscape: documentEscapeHandler,
     handleClick: createClickHandler(dialog),
     handleDocClick: createLightDismissHandler(dialog),
-    // NEW
     handleCancel: createCancelHandler(dialog),
     attrObserver: new MutationObserver(() => {
     })

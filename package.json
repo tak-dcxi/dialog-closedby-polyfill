@@ -1,6 +1,6 @@
 {
   "name": "dialog-closedby-polyfill",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Polyfill for the HTMLDialogElement closedBy attribute",
   "main": "index.js",
   "types": "index.d.ts",

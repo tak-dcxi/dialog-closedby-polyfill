@@ -29,16 +29,46 @@ let activeDialogs = new Set<HTMLDialogElement>();
 /**
  * Global `keydown` handler attached **once** to <kbd>document</kbd> to mirror
  * UA behavior for the *Escape* key. When multiple modal dialogs are stacked
- * (custom UI), every dialog examines the pressed key and decides whether the
- * event must be suppressed.
+ * (custom UI), only the topmost (most recently opened) dialog is processed
+ * to maintain proper modal behavior.
+ *
+ * @param event - The keyboard event to handle
+ *
+ * @remarks
+ * This implementation processes dialogs in reverse order of their addition
+ * to ensure that only the topmost dialog in the stack is affected by the
+ * Escape key. This follows standard modal dialog UX patterns where only
+ * the active/focused dialog should respond to dismissal actions.
  */
 function documentEscapeHandler(event: KeyboardEvent): void {
   if (event.key !== "Escape" || activeDialogs.size === 0) return;
-  for (const dlg of activeDialogs) {
-    if (getClosedByValue(dlg) === "none") {
-      event.preventDefault();
-      break; // only need to cancel once
+
+  let shouldPreventDefault = false;
+  let hasClosableDialog = false;
+
+  // Process dialogs in reverse order (most recently added first)
+  // to handle the topmost dialog in the stack
+  const dialogsArray = Array.from(activeDialogs).reverse();
+
+  for (const dialog of dialogsArray) {
+    const closedBy = getClosedByValue(dialog);
+
+    if (closedBy === "none") {
+      // Dialog prevents closure - stop processing and prevent default
+      shouldPreventDefault = true;
+      break;
+    } else if (closedBy === "any" || closedBy === "closerequest") {
+      // Close only the topmost closable dialog and stop processing
+      dialog.close();
+      hasClosableDialog = true;
+      break;
     }
+  }
+
+  // Prevent default browser behavior (like exiting fullscreen) when any dialog
+  // handles the ESC key, either by preventing closure or by closing the dialog
+  if (shouldPreventDefault || hasClosableDialog) {
+    event.preventDefault();
   }
 }
 

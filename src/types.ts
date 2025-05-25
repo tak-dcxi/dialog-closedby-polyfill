@@ -26,6 +26,9 @@ export interface DialogListeners {
   /** Mouse click handler installed on the dialog element. */
   handleClick: (event: MouseEvent) => void;
 
+  /** Document-level click handler that detects backdrop clicks even when backdrop has display: none. */
+  handleDocClick: (e: MouseEvent) => void;
+
   /** `cancel` event handler installed on the dialog element. */
   handleCancel: (event: Event) => void;
 

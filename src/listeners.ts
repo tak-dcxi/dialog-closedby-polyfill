@@ -19,6 +19,15 @@ function getClosedByValue(dialog: HTMLDialogElement): ClosedBy {
 }
 
 /**
+ * NOTE:
+ * By design, **only the top-most modal dialog in the pending-dialog stack
+ * should receive user input (pointer and keyboard events)**.
+ * Lower-layer dialogs are effectively inert until they become top-most.
+ * The `isTopMost()` helper enforces this rule wherever user actions need
+ * to be filtered.
+ */
+
+/**
  * Returns `true` if the dialog is the top-most (last added) modal in the stack.
  *
  * @param dialog - Dialog candidate.
@@ -36,36 +45,54 @@ function isTopMost(dialog: HTMLDialogElement): boolean {
 const activeDialogs = new Set<HTMLDialogElement>();
 
 /**
- * Mirrors native ESC-key behavior across stacked custom dialogs.
+ * Global `keydown` handler attached **once** to <kbd>document</kbd> to mirror
+ * UA behavior for the *Escape* key. When multiple modal dialogs are stacked
+ * (custom UI), only the topmost (most recently opened) dialog is processed
+ * to maintain proper modal behavior.
  *
- * @param event - Keyboard event.
+ * @param event - The keyboard event to handle
+ *
+ * @remarks
+ * This implementation processes dialogs in reverse order of their addition
+ * to ensure that only the topmost dialog in the stack is affected by the
+ * Escape key. This follows standard modal dialog UX patterns where only
+ * the active/focused dialog should respond to dismissal actions.
  */
 function documentEscapeHandler(event: KeyboardEvent): void {
   if (event.key !== "Escape" || activeDialogs.size === 0) return;
 
-  let preventDefault = false;
+  let shouldPreventDefault = false;
+  let hasClosableDialog = false;
 
-  // Iterate from top-most to bottom
-  for (const dialog of Array.from(activeDialogs).reverse()) {
+  // Process dialogs in reverse order (most recently added first)
+  // to handle the topmost dialog in the stack
+  const dialogsArray = Array.from(activeDialogs).reverse();
+
+  for (const dialog of dialogsArray) {
     const closedBy = getClosedByValue(dialog);
 
     if (closedBy === "none") {
-      // ESC is explicitly disabled
-      preventDefault = true;
+      // Dialog prevents closure - stop processing and prevent default
+      shouldPreventDefault = true;
       break;
     }
 
     if (closedBy === "any" || closedBy === "closerequest") {
+      // Close only the topmost closable dialog and stop processing
       dialog.close();
-      preventDefault = true;
+      hasClosableDialog = true;
       break;
     }
   }
 
-  if (preventDefault) event.preventDefault();
+  // Prevent default browser behavior (like exiting fullscreen) when any dialog
+  // handles the ESC key, either by preventing closure or by closing the dialog
+  if (shouldPreventDefault || hasClosableDialog) {
+    event.preventDefault();
+  }
 }
 
-document.addEventListener("keydown", documentEscapeHandler, { passive: true });
+document.addEventListener("keydown", documentEscapeHandler);
 
 /* -------------------------------------------------------------------------- */
 /* Light-dismiss handler for hidden backdrops                                 */
@@ -156,7 +183,7 @@ export function attachDialog(dialog: HTMLDialogElement): void {
   const state: DialogListeners = {
     handleEscape: documentEscapeHandler,
     handleClick: createClickHandler(dialog),
-    handleDocClick: createLightDismissHandler(dialog), // NEW
+    handleDocClick: createLightDismissHandler(dialog),
     handleCancel: createCancelHandler(dialog),
     attrObserver: new MutationObserver(() => {
       /* intentionally empty: reactivity handled via getClosedByValue() */

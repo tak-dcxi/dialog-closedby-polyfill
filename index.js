@@ -11,22 +11,26 @@ function isTopMost(dialog) {
 var activeDialogs = /* @__PURE__ */ new Set();
 function documentEscapeHandler(event) {
   if (event.key !== "Escape" || activeDialogs.size === 0) return;
-  let preventDefault = false;
-  for (const dialog of Array.from(activeDialogs).reverse()) {
+  let shouldPreventDefault = false;
+  let hasClosableDialog = false;
+  const dialogsArray = Array.from(activeDialogs).reverse();
+  for (const dialog of dialogsArray) {
     const closedBy = getClosedByValue(dialog);
     if (closedBy === "none") {
-      preventDefault = true;
+      shouldPreventDefault = true;
       break;
     }
     if (closedBy === "any" || closedBy === "closerequest") {
       dialog.close();
-      preventDefault = true;
+      hasClosableDialog = true;
       break;
     }
   }
-  if (preventDefault) event.preventDefault();
+  if (shouldPreventDefault || hasClosableDialog) {
+    event.preventDefault();
+  }
 }
-document.addEventListener("keydown", documentEscapeHandler, { passive: true });
+document.addEventListener("keydown", documentEscapeHandler);
 function createLightDismissHandler(dialog) {
   return function handleDocumentClick(event) {
     if (!isTopMost(dialog) || getClosedByValue(dialog) !== "any" || !dialog.open) {
@@ -58,6 +62,7 @@ function attachDialog(dialog) {
     handleEscape: documentEscapeHandler,
     handleClick: createClickHandler(dialog),
     handleDocClick: createLightDismissHandler(dialog),
+    // NEW
     handleCancel: createCancelHandler(dialog),
     attrObserver: new MutationObserver(() => {
     })

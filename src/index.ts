@@ -51,22 +51,34 @@ export function apply(): void {
   }
 
   /* Cache original methods */
+  const originalShow = HTMLDialogElement.prototype.show;
   const originalShowModal = HTMLDialogElement.prototype.showModal;
   const originalClose = HTMLDialogElement.prototype.close;
+
+  /**
+   * Wraps a dialog method to automatically attach event listeners
+   * when the dialog opens and has a `closedby` attribute.
+   */
+  function wrapDialogMethod(originalMethod: () => void): () => void {
+    return function (this: HTMLDialogElement): void {
+      originalMethod.call(this);
+
+      // Guard: could be detached from DOM – `.open` would be false.
+      if (!this.open) return;
+
+      if (this.hasAttribute("closedby")) {
+        attachDialog(this);
+      }
+    };
+  }
 
   /**
    * Monkey‑patch {@link HTMLDialogElement.showModal} so that event listeners
    * are wired up whenever the dialog opens *and* the author declared
    * `closedby`.
    */
-  HTMLDialogElement.prototype.showModal = function showModalPatched(): void {
-    originalShowModal.call(this);
-
-    // Guard: <dialog> could be detached from DOM – `.open` would be false.
-    if (!this.open) return;
-
-    if (this.hasAttribute("closedby")) attachDialog(this);
-  };
+  HTMLDialogElement.prototype.show = wrapDialogMethod(originalShow);
+  HTMLDialogElement.prototype.showModal = wrapDialogMethod(originalShowModal);
 
   /**
    * Ensures that listeners are removed before delegating to the native

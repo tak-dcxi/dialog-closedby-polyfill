@@ -135,7 +135,12 @@ function setupObservers() {
 // src/index.ts
 var polyfilled = false;
 function isSupported() {
-  return typeof HTMLDialogElement !== "undefined" && typeof HTMLDialogElement.prototype === "object" && "closedBy" in HTMLDialogElement.prototype;
+  if (typeof HTMLDialogElement === "undefined" || typeof HTMLDialogElement.prototype !== "object" || !("closedBy" in HTMLDialogElement.prototype)) {
+    return false;
+  }
+  const testDialog = document.createElement("dialog");
+  testDialog.setAttribute("closedby", "none");
+  return testDialog.closedBy === "none";
 }
 function isPolyfilled() {
   return polyfilled;

@@ -32,12 +32,28 @@ export function isSupported(): boolean {
     return false;
   }
 
+  // Ensure we are in a DOM environment with a usable `document` before
+  // performing any behavioural checks. In some non‑Window runtimes,
+  // `HTMLDialogElement` may exist even when `document` is unavailable.
+  if (
+    typeof document === "undefined" ||
+    typeof (document as Document).createElement !== "function"
+  ) {
+    return false;
+  }
+
   // Behavioural check: verify the getter actually reflects the content
   // attribute. Safari 26.2 exposes `closedBy` on the prototype but the
   // getter does not return the expected value.
-  const testDialog = document.createElement("dialog");
-  testDialog.setAttribute("closedby", "none");
-  return testDialog.closedBy === "none";
+  try {
+    const testDialog = document.createElement("dialog") as HTMLDialogElement;
+    testDialog.setAttribute("closedby", "none");
+    return (testDialog as any).closedBy === "none";
+  } catch {
+    // If anything goes wrong during the behavioural check, treat the
+    // feature as unsupported rather than throwing at import time.
+    return false;
+  }
 }
 
 /** Returns `true` once {@link apply} has run successfully. */

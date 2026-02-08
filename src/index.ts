@@ -42,7 +42,7 @@ export function isSupported(): boolean {
     return false;
   }
 
-  // Behavioural check: verify the getter actually reflects the content
+  // Behavioral check: verify the getter actually reflects the content
   // attribute. Safari 26.2 exposes `closedBy` on the prototype but the
   // getter does not return the expected value.
   try {

@@ -172,7 +172,11 @@ function createLightDismissHandler(dialog: HTMLDialogElement) {
     }
 
     if (!isClickInsideDialog(dialog, event.clientX, event.clientY)) {
-      dialog.close();
+      const notCancelled = dialog.dispatchEvent(new Event('cancel', { bubbles: false, cancelable: true }));
+
+      if (notCancelled) {
+        dialog.close();
+      }
     }
   };
 }

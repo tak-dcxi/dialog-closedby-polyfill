@@ -41,6 +41,20 @@ export function observeRoot(root: Document | ShadowRoot): void {
         }
       });
 
+      /* Handle changed open attribute */
+      mutations.forEach(async m => {
+        if (m.attributeName === 'open') {
+          const node = m.target;
+          if (
+            node instanceof HTMLDialogElement &&
+            node.open &&
+            node.hasAttribute("closedby")
+          ) {
+            attachDialog(node);
+          }
+        }
+      })
+
       /* Handle removed nodes */
       m.removedNodes.forEach((node) => {
         if (node instanceof HTMLDialogElement) detachDialog(node);
@@ -52,7 +66,7 @@ export function observeRoot(root: Document | ShadowRoot): void {
 
   const observedTarget = root === document ? document.body : root;
   if (observedTarget) {
-    rootObserver.observe(observedTarget, { childList: true, subtree: true });
+    rootObserver.observe(observedTarget, { childList: true, subtree: true, attributes: true, attributeFilter: ["open"] });
     observers.set(root, rootObserver);
   }
 }

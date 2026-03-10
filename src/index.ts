@@ -47,7 +47,6 @@ export function isSupported(): boolean {
   // getter does not return the expected value.
   try {
     const testDialog = document.createElement("dialog");
-    testDialog.setAttribute("closedby", "none");
     return (testDialog as HTMLDialogElement & { closedBy?: string }).closedBy === "none";
   } catch {
     // If anything goes wrong during the behavioural check, treat the

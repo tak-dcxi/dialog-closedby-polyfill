@@ -36,7 +36,7 @@ require("dialog-closedby-polyfill");
 If you need more control over when the polyfill is applied:
 
 ```javascript
-import { apply, isSupported } from "dialog-closedby-polyfill";
+import { apply, isSupported } from "dialog-closedby-polyfill/fn";
 
 if (!isSupported()) {
   apply();

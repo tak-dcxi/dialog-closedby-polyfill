@@ -6,9 +6,6 @@ import { ClosedBy } from "./types.js";
 /* Public helper utilities                                                    */
 /* -------------------------------------------------------------------------- */
 
-/** Tracks whether the polyfill has already patched prototypes. */
-let polyfilled = false;
-
 /**
  * Detects native support for the `closedBy` property. If this function returns
  * `true`, **no** polyfill is needed because the user‑agent already exposes
@@ -56,9 +53,13 @@ export function isSupported(): boolean {
   }
 }
 
-/** Returns `true` once {@link apply} has run successfully. */
-export function isPolyfilled(): boolean {
-  return polyfilled;
+export function isPolyfilled(): boolean | null {
+  // if the `showModal` method is defined but is not "native code"
+  // then we can infer it's been polyfilled
+  const firstDialog = document.querySelector('dialog')?.showModal;
+  return firstDialog ? Boolean(
+    !/native code/i.test(firstDialog.toString()),
+  ) : null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -71,7 +72,7 @@ export function isPolyfilled(): boolean {
  * well.
  */
 export function apply(): void {
-  if (polyfilled || isSupported()) return;
+  if (isPolyfilled() || isSupported()) return;
 
   // Older WebKit versions ship *no* <dialog> implementation at all. Abort early
   // because patching non‑existent prototypes would throw.
@@ -145,8 +146,6 @@ export function apply(): void {
 
   /* Kick‑off global observers */
   setupObservers();
-
-  polyfilled = true;
 }
 
 /**
@@ -157,14 +156,6 @@ export function apply(): void {
  * implementations on the prototype. It only cleans up observers and listeners.
  */
 export function teardown(): void {
-  if (!polyfilled) return;
+  if (!isPolyfilled()) return;
   teardownObservers();
-  polyfilled = false;
 }
-
-/* -------------------------------------------------------------------------- */
-/* Auto-apply polyfill when imported                                          */
-/* -------------------------------------------------------------------------- */
-
-// Automatically apply the polyfill when this module is imported
-if (!isSupported()) apply();

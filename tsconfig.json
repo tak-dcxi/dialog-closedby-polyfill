@@ -17,6 +17,6 @@
     "rootDir": "./src",
     "lib": ["DOM", "esnext"]
   },
-  "include": ["src/index.ts"],
+  "include": ["src/dialog-closedby.ts"],
   "exclude": ["node_modules", "**/*.test.*"]
 }

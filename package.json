@@ -2,21 +2,28 @@
   "name": "dialog-closedby-polyfill",
   "version": "1.3.0",
   "description": "Polyfill for the HTMLDialogElement closedBy attribute",
+  "type": "module",
   "main": "index.js",
-  "types": "index.d.ts",
+  "types": "dialog-closedby.d.ts",
+  "sideEffects": false,
   "exports": {
     ".": {
-      "types": "./index.d.ts",
+      "types": "./dialog-closedby.d.ts",
       "import": "./index.js",
-      "require": "./index.js"
+      "require": "./dialog-closedby.js"
+    },
+    "./fn": {
+      "types": "./dialog-closedby.d.ts",
+      "import": "./dialog-closedby.js"
     }
   },
   "files": [
     "index.js",
-    "index.d.ts"
+    "dialog-closedby.js",
+    "dialog-closedby.d.ts"
   ],
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --format=esm --outfile=index.js",
+    "build": "esbuild src/dialog-closedby.ts --bundle --format=esm --outfile=dialog-closedby.js",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

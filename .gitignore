@@ -1,7 +1,9 @@
 # Dependencies
 node_modules/
 
-# Note: index.js and index-fn.d.ts are hand-written, not generated
+# Note: index.d.ts is hand-written, not generated
+index.js
+index.cjs
 
 # Editor directories and files
 .idea/

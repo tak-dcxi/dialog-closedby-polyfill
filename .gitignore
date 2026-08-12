@@ -2,8 +2,6 @@
 node_modules/
 
 # Note: index.d.ts is hand-written, not generated
-index.js
-index.cjs
 
 # Editor directories and files
 .idea/

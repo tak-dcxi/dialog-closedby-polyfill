@@ -1,7 +1,7 @@
 # Dependencies
 node_modules/
 
-# Note: index.js and index-fn.d.ts are hand-written, not generated
+# Note: built bundles (index.*, fn.*) are committed on purpose; index.d.ts and fn.d.ts are hand-written
 
 # Editor directories and files
 .idea/

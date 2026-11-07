@@ -1,23 +1,51 @@
 {
   "name": "dialog-closedby-polyfill",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Polyfill for the HTMLDialogElement closedBy attribute",
-  "main": "index.js",
-  "types": "index.d.ts",
+  "type": "module",
+  "main": "./index.js",
+  "types": "./index.d.ts",
   "exports": {
     ".": {
-      "types": "./index.d.ts",
-      "import": "./index.js",
-      "require": "./index.js"
-    }
+      "import": {
+        "types": "./index.d.ts",
+        "default": "./index.js"
+      },
+      "require": {
+        "types": "./index.d.cts",
+        "default": "./index.cjs"
+      }
+    },
+    "./fn": {
+      "import": {
+        "types": "./fn.d.ts",
+        "default": "./fn.js"
+      },
+      "require": {
+        "types": "./fn.d.cts",
+        "default": "./fn.cjs"
+      }
+    },
+    "./package.json": "./package.json"
   },
+  "sideEffects": [
+    "./index.js",
+    "./index.cjs"
+  ],
   "files": [
     "index.js",
-    "index.d.ts"
+    "index.cjs",
+    "index.d.ts",
+    "index.d.cts",
+    "fn.js",
+    "fn.cjs",
+    "fn.d.ts",
+    "fn.d.cts"
   ],
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --format=esm --outfile=index.js",
-    "prepublishOnly": "npm run build"
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run typecheck && npm run build"
   },
   "keywords": [
     "dialog",

@@ -2,10 +2,13 @@
  * The set of legal values for the {@link HTMLDialogElement.closedBy | closedBy}
  * attribute / property.
  *
- *  * `"any"`           – Allow all closing interactions (default).
+ *  * `"any"`           – Allow all closing interactions.
  *  * `"closerequest"` – Ignore backdrop clicks, allow <kbd>Escape</kbd> &
  *                        `close()` calls.
  *  * `"none"`          – Disallow backdrop clicks *and* <kbd>Escape</kbd>.
+ *
+ * A missing or invalid attribute is the *Auto* state: `closedBy` then reads
+ * `"closerequest"` for modal dialogs and `"none"` for modeless ones.
  */
 export type ClosedBy = "any" | "closerequest" | "none";
 

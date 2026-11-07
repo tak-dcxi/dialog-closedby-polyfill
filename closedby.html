@@ -263,7 +263,15 @@
       }
 
       // Monitor dialog state changes only (no manual event handling)
-      ["dialog1", "dialog2", "dialog3", "dialog4"].forEach((id, index) => {
+      [
+        "dialog1",
+        "dialog2",
+        "dialog3",
+        "dialog4",
+        "dialog5",
+        "dialog6",
+        "dialog7",
+      ].forEach((id, index) => {
         const dialog = document.getElementById(id);
         const statusId = `status${index + 1}`;
 
@@ -298,6 +306,28 @@
         ).textContent = `closedby="${value}"`;
         console.log(`Changed closedby attribute to "${value}"`);
       };
+
+      // Test 5: Modeless dialog opened with show()
+      document
+        .getElementById("openDialog5")
+        .addEventListener("click", () => {
+          document.getElementById("dialog5").show();
+        });
+
+      // Test 6: Cancel the close request from a `cancel` listener
+      document.getElementById("dialog6").addEventListener("cancel", (e) => {
+        if (document.getElementById("preventCancel6").checked) {
+          e.preventDefault();
+          console.log("dialog6 cancel prevented");
+        }
+      });
+
+      // Test 7: Show the computed closedBy value of the Auto state
+      const dialog7 = document.getElementById("dialog7");
+      new MutationObserver(() => {
+        document.getElementById("computedValue7").textContent =
+          `dialog.closedBy === "${dialog7.closedBy}"`;
+      }).observe(dialog7, { attributes: true, attributeFilter: ["open"] });
 
       // Check for native support
       const hasNativeSupport = isSupported();
@@ -336,9 +366,7 @@
 
     <!-- Test 1: closedby="any" -->
     <section class="Section">
-      <h2 class="Section__Heading">
-        Test 1: closedby="any" (default behavior)
-      </h2>
+      <h2 class="Section__Heading">Test 1: closedby="any"</h2>
       <p>Can be closed with ESC key, backdrop click, and close button.</p>
       <div class="Section__Button">
         <button
@@ -538,6 +566,137 @@
           type="button"
           class="BaseButton"
           commandfor="dialog4"
+          command="close"
+        >
+          Close
+        </button>
+      </div>
+    </dialog>
+
+    <!-- Test 5: Modeless dialog -->
+    <section class="Section">
+      <h2 class="Section__Heading">Test 5: Modeless dialog (show())</h2>
+      <p>
+        Opened with <code>show()</code> and <code>closedby="any"</code>. Closes
+        with ESC key, a click outside the dialog, and the close button.
+      </p>
+      <div class="Section__Button">
+        <button type="button" class="BaseButton" id="openDialog5">
+          Open Dialog
+        </button>
+      </div>
+      <p class="BaseStatus" id="status5">Status: Closed</p>
+    </section>
+
+    <dialog
+      class="AppDialog"
+      id="dialog5"
+      closedby="any"
+      aria-labelledby="dialog5-title"
+    >
+      <div class="AppDialog__Layout">
+        <h1 id="dialog5-title" class="AppDialog__Heading">
+          Modeless dialog with closedby="any"
+        </h1>
+        <button
+          type="button"
+          class="BaseButton"
+          commandfor="dialog5"
+          command="close"
+        >
+          Close
+        </button>
+      </div>
+    </dialog>
+
+    <!-- Test 6: Preventing the cancel event -->
+    <section class="Section">
+      <h2 class="Section__Heading">Test 6: Preventing the cancel event</h2>
+      <p>
+        <code>closedby="any"</code>. ESC key and backdrop clicks fire
+        <code>cancel</code> first. While the checkbox is checked, the
+        <code>cancel</code> listener calls <code>preventDefault()</code> and
+        the dialog stays open.
+      </p>
+      <div class="Section__Button">
+        <button
+          type="button"
+          class="BaseButton"
+          id="openDialog6"
+          commandfor="dialog6"
+          command="show-modal"
+        >
+          Open Dialog
+        </button>
+      </div>
+      <p class="BaseStatus" id="status6">Status: Closed</p>
+    </section>
+
+    <dialog
+      class="AppDialog"
+      id="dialog6"
+      closedby="any"
+      aria-labelledby="dialog6-title"
+      autofocus
+    >
+      <div class="AppDialog__Layout">
+        <h1 id="dialog6-title" class="AppDialog__Heading">
+          Dialog that can veto closing
+        </h1>
+        <p>
+          <label>
+            <input type="checkbox" id="preventCancel6" checked />
+            Prevent the <code>cancel</code> event
+          </label>
+        </p>
+        <button
+          type="button"
+          class="BaseButton"
+          commandfor="dialog6"
+          command="close"
+        >
+          Close
+        </button>
+      </div>
+    </dialog>
+
+    <!-- Test 7: Default (Auto) behavior -->
+    <section class="Section">
+      <h2 class="Section__Heading">Test 7: No closedby attribute (Auto)</h2>
+      <p>
+        A modal dialog without <code>closedby</code> behaves like
+        <code>closedby="closerequest"</code>: ESC key closes it, backdrop
+        clicks are ignored.
+      </p>
+      <div class="Section__Button">
+        <button
+          type="button"
+          class="BaseButton"
+          id="openDialog7"
+          commandfor="dialog7"
+          command="show-modal"
+        >
+          Open Dialog
+        </button>
+      </div>
+      <p class="BaseStatus" id="status7">Status: Closed</p>
+    </section>
+
+    <dialog
+      class="AppDialog"
+      id="dialog7"
+      aria-labelledby="dialog7-title"
+      autofocus
+    >
+      <div class="AppDialog__Layout">
+        <h1 id="dialog7-title" class="AppDialog__Heading">
+          Dialog without closedby
+        </h1>
+        <p><code id="computedValue7"></code></p>
+        <button
+          type="button"
+          class="BaseButton"
+          commandfor="dialog7"
           command="close"
         >
           Close

@@ -1,4 +1,11 @@
-import { attachDialog, detachDialog, registerEscapeHandler, unregisterEscapeHandler, detachAllDialogs } from "./listeners.js";
+import {
+  attachDialog,
+  detachDialog,
+  isAttached,
+  registerEscapeHandler,
+  unregisterEscapeHandler,
+  detachAllDialogs,
+} from "./listeners.js";
 
 /** Stores all active MutationObservers for cleanup. */
 const observers = new Map<Document | ShadowRoot, MutationObserver>();
@@ -6,40 +13,42 @@ const observers = new Map<Document | ShadowRoot, MutationObserver>();
 /** Stores the original attachShadow method for restoration. */
 let originalAttachShadow: typeof HTMLElement.prototype.attachShadow | null = null;
 
+/** Attaches listeners to an open dialog unless it is already tracked. */
+function attachIfOpen(node: Node): void {
+  if (node instanceof HTMLDialogElement && node.open && !isAttached(node)) {
+    attachDialog(node);
+  }
+}
+
 /**
  * Sets up a tree‑wide observer for a given {@link Document | ShadowRoot}. It
  * reacts to the following events:
  *
- *  1. A *closedBy*‑decorated dialog is **added** → `attachDialog()`.
- *  2. Such a dialog is **removed** from the subtree → `detachDialog()`.
- *  3. The dialog's `open` attribute flips while it remains in the tree
- *     (handled via patched `showModal` / `show` / `close`).
+ *  1. An open dialog is **added** → `attachDialog()`.
+ *  2. A dialog is **removed** from the subtree → `detachDialog()`.
+ *  3. A dialog's `open` attribute flips while it remains in the tree. This
+ *     covers dialogs opened without the patched `show()` / `showModal()`,
+ *     such as native invoker commands (`command="show-modal"`).
+ *
+ * @see https://github.com/tak-dcxi/dialog-closedby-polyfill/issues/22
  */
 export function observeRoot(root: Document | ShadowRoot): void {
   // Avoid duplicate observers for the same root
   if (observers.has(root)) return;
   /* Bootstrap existing instances */
-  root.querySelectorAll("dialog[closedby]").forEach((d) => {
-    if (d instanceof HTMLDialogElement && d.open) attachDialog(d);
-  });
+  root.querySelectorAll("dialog").forEach(attachIfOpen);
 
   const rootObserver = new MutationObserver((mutations) => {
-    mutations.forEach((m) => {
-      /* Handle added nodes */
-      m.addedNodes.forEach((node) => {
-        if (
-          node instanceof HTMLDialogElement &&
-          node.open &&
-          node.hasAttribute("closedby")
-        ) {
-          attachDialog(node);
+    for (const m of mutations) {
+      /* Handle a flipped `open` attribute */
+      if (m.type === "attributes") {
+        const node = m.target;
+        if (node instanceof HTMLDialogElement) {
+          if (node.open) attachIfOpen(node);
+          else detachDialog(node);
         }
-        if (node instanceof Element) {
-          node.querySelectorAll("dialog[closedby]").forEach((d) => {
-            if (d instanceof HTMLDialogElement && d.open) attachDialog(d);
-          });
-        }
-      });
+        continue;
+      }
 
       /* Handle removed nodes */
       m.removedNodes.forEach((node) => {
@@ -47,12 +56,25 @@ export function observeRoot(root: Document | ShadowRoot): void {
         if (node instanceof Element)
           node.querySelectorAll("dialog").forEach(detachDialog);
       });
-    });
+
+      /* Handle added nodes */
+      m.addedNodes.forEach((node) => {
+        attachIfOpen(node);
+        if (node instanceof Element) {
+          node.querySelectorAll("dialog").forEach(attachIfOpen);
+        }
+      });
+    }
   });
 
   const observedTarget = root === document ? document.body : root;
   if (observedTarget) {
-    rootObserver.observe(observedTarget, { childList: true, subtree: true });
+    rootObserver.observe(observedTarget, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["open"],
+    });
     observers.set(root, rootObserver);
   }
 }

@@ -4,6 +4,8 @@ import {
   isAttached,
   registerEscapeHandler,
   unregisterEscapeHandler,
+  registerLightDismissHandlers,
+  unregisterLightDismissHandlers,
   detachAllDialogs,
 } from "./listeners.js";
 
@@ -119,8 +121,9 @@ function unpatchAttachShadow(): void {
  * Initializes all observers after ensuring DOM is ready.
  */
 function initializeObservers(): void {
-  // Register the global escape key handler
+  // Register the global escape key and light dismiss handlers
   registerEscapeHandler();
+  registerLightDismissHandlers();
 
   // Observe the main document
   observeRoot(document);
@@ -160,5 +163,6 @@ export function teardownObservers(): void {
   observers.clear();
   unpatchAttachShadow();
   unregisterEscapeHandler();
+  unregisterLightDismissHandlers();
   detachAllDialogs();
 }

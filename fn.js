@@ -41,9 +41,6 @@ function isClickInsideDialog(dialog, x, y) {
   const rect = dialog.getBoundingClientRect();
   return rect.top < y && y < rect.bottom && rect.left < x && x < rect.right;
 }
-function isTopMost(dialog) {
-  return getTopMostDialog() === dialog;
-}
 function getTopMostDialog() {
   let last;
   for (const dialog of activeDialogs) {
@@ -81,32 +78,56 @@ function detachAllDialogs() {
   const dialogs = Array.from(activeDialogs);
   dialogs.forEach(detachDialog);
 }
-function createLightDismissHandler(dialog) {
-  return function handleDocumentClick(event) {
-    const state = dialogStates.get(dialog);
-    if (state) {
-      if (event.timeStamp <= state.openedAt) return;
-      const target = event.target;
-      if (dialog.contains(target)) return;
-    }
-    if (!isTopMost(dialog) || getComputedClosedBy(dialog) !== "any" || !dialog.open) {
-      return;
-    }
-    if (!isClickInsideDialog(dialog, event.clientX, event.clientY)) {
-      requestCloseCompat(dialog);
-    }
-  };
+var pointerdownRecord = null;
+var lightDismissHandlersRegistered = false;
+function toPointerRecord(event) {
+  return { path: event.composedPath(), x: event.clientX, y: event.clientY };
 }
-function createClickHandler(dialog) {
-  return function handleClick(event) {
-    const state = dialogStates.get(dialog);
-    if (state && event.timeStamp <= state.openedAt) return;
-    if (event.target !== dialog) return;
-    if (getComputedClosedBy(dialog) !== "any") return;
-    if (!isClickInsideDialog(dialog, event.clientX, event.clientY)) {
-      requestCloseCompat(dialog);
-    }
-  };
+function getNearestClickedDialog({
+  path,
+  x,
+  y
+}) {
+  const target = path[0];
+  if (target instanceof HTMLDialogElement && target.open && isModal(target) && !isClickInsideDialog(target, x, y)) {
+    return null;
+  }
+  for (const node of path) {
+    if (node instanceof HTMLDialogElement && node.open) return node;
+  }
+  return null;
+}
+function documentPointerHandler(event) {
+  if (!event.isTrusted) return;
+  if (event.type === "pointerdown") {
+    pointerdownRecord = toPointerRecord(event);
+    return;
+  }
+  const down = pointerdownRecord;
+  pointerdownRecord = null;
+  if (event.type !== "pointerup" || !down) return;
+  const topDialog = getTopMostDialog();
+  if (!topDialog || !topDialog.open) return;
+  const ancestor = getNearestClickedDialog(toPointerRecord(event));
+  if (ancestor !== getNearestClickedDialog(down)) return;
+  if (ancestor === topDialog) return;
+  if (getComputedClosedBy(topDialog) !== "any") return;
+  requestCloseCompat(topDialog);
+}
+function registerLightDismissHandlers() {
+  if (lightDismissHandlersRegistered) return;
+  document.addEventListener("pointerdown", documentPointerHandler, true);
+  document.addEventListener("pointerup", documentPointerHandler, true);
+  document.addEventListener("pointercancel", documentPointerHandler, true);
+  lightDismissHandlersRegistered = true;
+}
+function unregisterLightDismissHandlers() {
+  if (!lightDismissHandlersRegistered) return;
+  document.removeEventListener("pointerdown", documentPointerHandler, true);
+  document.removeEventListener("pointerup", documentPointerHandler, true);
+  document.removeEventListener("pointercancel", documentPointerHandler, true);
+  pointerdownRecord = null;
+  lightDismissHandlersRegistered = false;
 }
 function createCancelHandler(dialog) {
   return function handleCancel(event) {
@@ -121,42 +142,28 @@ function isAttached(dialog) {
 }
 function attachDialog(dialog) {
   if (dialogStates.has(dialog)) {
-    const state2 = dialogStates.get(dialog);
-    state2.openedAt = performance.now();
     activeDialogs.delete(dialog);
     activeDialogs.add(dialog);
     return;
   }
   const state = {
-    handleClick: createClickHandler(dialog),
-    handleDocClick: createLightDismissHandler(dialog),
     handleCancel: createCancelHandler(dialog),
     // The close event is queued, so the dialog may already have been
     // reopened by the time it fires. Keep the listeners in that case.
     handleClose: () => {
       if (!dialog.open) detachDialog(dialog);
-    },
-    /**
-     * Timestamp when the dialog was opened.
-     * Uses performance.now() which shares the same time origin as event.timeStamp
-     * in modern browsers (DOMHighResTimeStamp).
-     */
-    openedAt: performance.now()
+    }
   };
-  dialog.addEventListener("click", state.handleClick);
   dialog.addEventListener("cancel", state.handleCancel);
   dialog.addEventListener("close", state.handleClose);
-  document.addEventListener("click", state.handleDocClick, true);
   activeDialogs.add(dialog);
   dialogStates.set(dialog, state);
 }
 function detachDialog(dialog) {
   const state = dialogStates.get(dialog);
   if (!state) return;
-  dialog.removeEventListener("click", state.handleClick);
   dialog.removeEventListener("cancel", state.handleCancel);
   dialog.removeEventListener("close", state.handleClose);
-  document.removeEventListener("click", state.handleDocClick, true);
   activeDialogs.delete(dialog);
   dialogStates.delete(dialog);
 }
@@ -230,6 +237,7 @@ function unpatchAttachShadow() {
 }
 function initializeObservers() {
   registerEscapeHandler();
+  registerLightDismissHandlers();
   observeRoot(document);
   if (document.body) {
     findShadowRoots(document.body).forEach(observeRoot);
@@ -250,6 +258,7 @@ function teardownObservers() {
   observers.clear();
   unpatchAttachShadow();
   unregisterEscapeHandler();
+  unregisterLightDismissHandlers();
   detachAllDialogs();
 }
 

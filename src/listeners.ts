@@ -92,12 +92,12 @@ function requestCloseCompat(dialog: HTMLDialogElement): void {
 }
 
 /**
- * Checks if a click at the given coordinates is inside the dialog's bounding rect.
+ * Checks if a pointer at the given coordinates is inside the dialog's bounding rect.
  *
  * @param dialog - The dialog element to check against.
- * @param x - The clientX coordinate of the click.
- * @param y - The clientY coordinate of the click.
- * @returns `true` if the click is inside the dialog, `false` otherwise.
+ * @param x - The clientX coordinate of the pointer.
+ * @param y - The clientY coordinate of the pointer.
+ * @returns `true` if the pointer is inside the dialog, `false` otherwise.
  */
 function isClickInsideDialog(
   dialog: HTMLDialogElement,
@@ -110,20 +110,10 @@ function isClickInsideDialog(
 
 /**
  * NOTE:
- * By design, **only the top-most dialog should receive user input
- * (pointer and keyboard events)**. Lower-layer dialogs are effectively
- * inert until they become top-most. The `isTopMost()` helper enforces this
- * rule wherever user actions need to be filtered.
+ * By design, **only the top-most dialog reacts to user input
+ * (pointer and keyboard events)**. Light dismiss and Escape always act on
+ * the dialog returned by `getTopMostDialog()`.
  */
-
-/**
- * Returns `true` if the dialog is the top-most (last opened) dialog.
- *
- * @param dialog - Dialog candidate.
- */
-function isTopMost(dialog: HTMLDialogElement): boolean {
-  return getTopMostDialog() === dialog;
-}
 
 /**
  * Returns the top-most dialog, or `undefined` if none is open.
@@ -211,72 +201,133 @@ export function detachAllDialogs(): void {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Light-dismiss handler for hidden backdrops                                 */
+/* Document-level light dismiss                                               */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Creates a document-wide click handler that emulates backdrop clicks, and
- * clicks outside modeless dialogs.
+ * What the last `pointerdown` hit, kept until the matching `pointerup`.
+ * `null` means no `pointerdown` was recorded for the current gesture.
  *
- * @param dialog - The dialog to be controlled.
+ * The event path is stored instead of the spec's *dialog pointerdown target*
+ * because native implementations compute that target after the event has
+ * been dispatched, while this capture listener runs before page handlers.
+ * Resolving the path at `pointerup` gives the same result: a dialog opened by
+ * a `pointerdown` handler is not on the path, so the press counts as outside.
  */
-function createLightDismissHandler(dialog: HTMLDialogElement) {
-  /**
-   * Handles clicks captured at the document level.
-   *
-   * @param event - Pointer event.
-   */
-  return function handleDocumentClick(event: MouseEvent): void {
-    const state = dialogStates.get(dialog);
+let pointerdownRecord: PointerRecord | null = null;
 
-    // Ignore clicks from before the dialog was opened or clicks that
-    // originated from inside the dialog (even if coordinates are outside)
-    if (state) {
-      if (event.timeStamp <= state.openedAt) return;
-      const target = event.target as Node;
-      if (dialog.contains(target)) return;
-    }
-
-    // Only the top-most, open dialog with closedby="any" can be dismissed.
-    if (
-      !isTopMost(dialog) ||
-      getComputedClosedBy(dialog) !== "any" ||
-      !dialog.open
-    ) {
-      return;
-    }
-
-    if (!isClickInsideDialog(dialog, event.clientX, event.clientY)) {
-      requestCloseCompat(dialog);
-    }
-  };
+/** The parts of a pointer event needed to find its nearest clicked dialog. */
+interface PointerRecord {
+  path: EventTarget[];
+  x: number;
+  y: number;
 }
 
-/* -------------------------------------------------------------------------- */
-/* cancel / click handlers bound per dialog                                   */
-/* -------------------------------------------------------------------------- */
+/** Tracks whether the light dismiss handlers have been registered. */
+let lightDismissHandlersRegistered = false;
+
+/** Captures the parts of a pointer event needed by {@link getNearestClickedDialog}. */
+function toPointerRecord(event: PointerEvent): PointerRecord {
+  return { path: event.composedPath(), x: event.clientX, y: event.clientY };
+}
 
 /**
- * Generates a click handler that closes the dialog when the backdrop
- * (the element itself) is clicked and `closedby="any"`.
+ * Returns the spec's *nearest clicked dialog* of a pointer event: the closest
+ * open dialog that contains the event target in the flat tree, or `null` when
+ * the event landed outside every dialog. A press on the backdrop of a modal
+ * dialog (the dialog itself is the target, but the coordinates are outside
+ * its box) counts as outside.
  *
- * @param dialog - Host dialog element.
+ * `composedPath()` exposes targets inside open shadow roots. Targets inside
+ * closed shadow roots are hidden behind their host.
+ *
+ * @see https://html.spec.whatwg.org/multipage/interactive-elements.html#nearest-clicked-dialog
  */
-function createClickHandler(dialog: HTMLDialogElement) {
-  return function handleClick(event: MouseEvent): void {
-    const state = dialogStates.get(dialog);
+function getNearestClickedDialog({
+  path,
+  x,
+  y,
+}: PointerRecord): HTMLDialogElement | null {
+  const target = path[0];
 
-    // Ignore clicks from before the dialog was opened
-    if (state && event.timeStamp <= state.openedAt) return;
+  if (
+    target instanceof HTMLDialogElement &&
+    target.open &&
+    isModal(target) &&
+    !isClickInsideDialog(target, x, y)
+  ) {
+    return null;
+  }
 
-    if (event.target !== dialog) return;
-    if (getComputedClosedBy(dialog) !== "any") return;
-
-    if (!isClickInsideDialog(dialog, event.clientX, event.clientY)) {
-      requestCloseCompat(dialog);
-    }
-  };
+  for (const node of path) {
+    if (node instanceof HTMLDialogElement && node.open) return node;
+  }
+  return null;
 }
+
+/**
+ * Light dismiss, following the spec's "light dismiss open dialogs" steps.
+ *
+ * - `pointerdown` records what was pressed.
+ * - `pointerup` closes the top-most dialog with `closedby="any"` only when
+ *   the press and the release have the same nearest clicked dialog, and that
+ *   dialog is not the top-most one. A drag that starts inside the dialog and
+ *   ends on the backdrop therefore keeps it open.
+ * - `pointercancel` (e.g. a touch that turns into scrolling) drops the record.
+ *
+ * Only trusted events are handled, as in native implementations.
+ *
+ * @see https://html.spec.whatwg.org/multipage/interactive-elements.html#light-dismiss-open-dialogs
+ */
+function documentPointerHandler(event: PointerEvent): void {
+  if (!event.isTrusted) return;
+
+  if (event.type === "pointerdown") {
+    pointerdownRecord = toPointerRecord(event);
+    return;
+  }
+
+  // pointerup or pointercancel
+  const down = pointerdownRecord;
+  pointerdownRecord = null;
+  if (event.type !== "pointerup" || !down) return;
+
+  const topDialog = getTopMostDialog();
+  if (!topDialog || !topDialog.open) return;
+
+  const ancestor = getNearestClickedDialog(toPointerRecord(event));
+  if (ancestor !== getNearestClickedDialog(down)) return;
+  if (ancestor === topDialog) return;
+  if (getComputedClosedBy(topDialog) !== "any") return;
+
+  requestCloseCompat(topDialog);
+}
+
+/**
+ * Registers the document-level light dismiss handlers. Capture phase is used
+ * so that `stopPropagation()` in frameworks does not hide the events.
+ */
+export function registerLightDismissHandlers(): void {
+  if (lightDismissHandlersRegistered) return;
+  document.addEventListener("pointerdown", documentPointerHandler, true);
+  document.addEventListener("pointerup", documentPointerHandler, true);
+  document.addEventListener("pointercancel", documentPointerHandler, true);
+  lightDismissHandlersRegistered = true;
+}
+
+/** Unregisters the document-level light dismiss handlers. */
+export function unregisterLightDismissHandlers(): void {
+  if (!lightDismissHandlersRegistered) return;
+  document.removeEventListener("pointerdown", documentPointerHandler, true);
+  document.removeEventListener("pointerup", documentPointerHandler, true);
+  document.removeEventListener("pointercancel", documentPointerHandler, true);
+  pointerdownRecord = null;
+  lightDismissHandlersRegistered = false;
+}
+
+/* -------------------------------------------------------------------------- */
+/* cancel handler bound per dialog                                            */
+/* -------------------------------------------------------------------------- */
 
 /**
  * Generates a `cancel` handler that keeps `closedby="none"` dialogs open
@@ -314,23 +365,15 @@ export function isAttached(dialog: HTMLDialogElement): boolean {
  * while the dialog is open.
  *
  * The function is idempotent; subsequent calls on the same element update
- * the openedAt timestamp and stack order but do not re-attach listeners.
- *
- * Click handlers use event.timeStamp to ignore clicks that occurred before
- * the dialog was opened. This prevents the dialog from immediately closing
- * when re-opened after being closed by a button click inside it.
+ * the stack order but do not re-attach listeners.
  *
  * A close event listener ensures cleanup happens regardless of how the dialog
  * was closed (including via <form method="dialog">).
  */
 export function attachDialog(dialog: HTMLDialogElement): void {
   if (dialogStates.has(dialog)) {
-    // Dialog already tracked - update openedAt for the new open.
-    // This handles cases where the dialog was closed via <form method="dialog">
-    // which fires the close event but may be reopened in the same tick.
-    const state = dialogStates.get(dialog)!;
-    state.openedAt = performance.now();
-
+    // Dialog already tracked, e.g. closed via <form method="dialog"> and
+    // reopened before the queued close event fired.
     // Update stack order: remove and re-add to ensure this dialog is topmost
     activeDialogs.delete(dialog);
     activeDialogs.add(dialog);
@@ -338,28 +381,16 @@ export function attachDialog(dialog: HTMLDialogElement): void {
   }
 
   const state: DialogListeners = {
-    handleClick: createClickHandler(dialog),
-    handleDocClick: createLightDismissHandler(dialog),
     handleCancel: createCancelHandler(dialog),
     // The close event is queued, so the dialog may already have been
     // reopened by the time it fires. Keep the listeners in that case.
     handleClose: () => {
       if (!dialog.open) detachDialog(dialog);
     },
-    /**
-     * Timestamp when the dialog was opened.
-     * Uses performance.now() which shares the same time origin as event.timeStamp
-     * in modern browsers (DOMHighResTimeStamp).
-     */
-    openedAt: performance.now(),
   };
 
-  dialog.addEventListener("click", state.handleClick);
   dialog.addEventListener("cancel", state.handleCancel);
   dialog.addEventListener("close", state.handleClose);
-
-  // Capture phase to avoid stopPropagation() in frameworks
-  document.addEventListener("click", state.handleDocClick, true);
 
   activeDialogs.add(dialog);
   dialogStates.set(dialog, state);
@@ -374,10 +405,8 @@ export function detachDialog(dialog: HTMLDialogElement): void {
   const state = dialogStates.get(dialog);
   if (!state) return;
 
-  dialog.removeEventListener("click", state.handleClick);
   dialog.removeEventListener("cancel", state.handleCancel);
   dialog.removeEventListener("close", state.handleClose);
-  document.removeEventListener("click", state.handleDocClick, true);
 
   activeDialogs.delete(dialog);
   dialogStates.delete(dialog);

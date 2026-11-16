@@ -19,22 +19,9 @@ export type ClosedBy = "any" | "closerequest" | "none";
  * tree.
  */
 export interface DialogListeners {
-  /** Mouse click handler installed on the dialog element. */
-  handleClick: (event: MouseEvent) => void;
-
-  /** Document-level click handler that detects backdrop clicks even when backdrop has display: none. */
-  handleDocClick: (e: MouseEvent) => void;
-
   /** `cancel` event handler installed on the dialog element. */
   handleCancel: (event: Event) => void;
 
   /** `close` event handler that triggers cleanup when the dialog closes. */
   handleClose: () => void;
-
-  /**
-   * Timestamp when the dialog was opened.
-   * Uses performance.now() which shares the same time origin as event.timeStamp
-   * in modern browsers (DOMHighResTimeStamp).
-   */
-  openedAt: number;
 }

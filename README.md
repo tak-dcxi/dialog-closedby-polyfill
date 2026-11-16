@@ -92,6 +92,8 @@ The `closedby` attribute controls how a dialog can be dismissed. It applies to m
 
 Closing with the ESC key or a backdrop click fires a cancelable `cancel` event first, as in native implementations. Call `event.preventDefault()` in a `cancel` listener to keep the dialog open.
 
+A backdrop click closes the dialog only when the pointer is both pressed and released outside the dialog. A drag that starts inside the dialog and ends on the backdrop, such as a text selection, keeps it open.
+
 ### Default behavior (no attribute or an invalid value)
 
 Without a valid `closedby` value, the dialog uses the *Auto* state defined by the HTML specification:
@@ -299,7 +301,7 @@ The polyfill works by:
 1. **Observing the `open` attribute**: Uses MutationObserver to catch dialogs opened by other means, such as native invoker commands
 1. **Handling Events**:
    - `keydown` event for ESC key detection (modeless dialogs get a close request of their own)
-   - `click` events for backdrop clicks and clicks outside modeless dialogs
+   - `pointerdown` / `pointerup` events for backdrop clicks and clicks outside modeless dialogs, following the light dismiss steps of the HTML specification
    - `cancel` event, fired before light dismiss and ESC closes the dialog
    - `close` event for cleanup
 1. **Cleanup**: Removes event listeners when dialog is closed
@@ -349,6 +351,18 @@ Declarative `command/commandfor` attributes to provide dialog button operations 
 ```
 
 ## Release Notes
+
+### v1.4.1
+
+- **Fixed**: A drag that starts inside a dialog and ends on the backdrop, such as a text selection, no longer closes a `closedby="any"` dialog ([#26](https://github.com/tak-dcxi/dialog-closedby-polyfill/issues/26))
+
+#### Behavior changes
+
+Light dismiss now follows the HTML specification and matches native implementations: it compares where the pointer was pressed (`pointerdown`) and released (`pointerup`).
+
+- The dialog fires `cancel` and closes on `pointerup`, before the `click` event. On touch devices, the `click` that follows a tap on the backdrop reaches the element under the backdrop.
+- Right and middle clicks on the backdrop close the dialog.
+- Synthetic events, such as `dialog.click()`, no longer close the dialog.
 
 ### v1.4.0
 

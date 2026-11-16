@@ -271,6 +271,7 @@
         "dialog5",
         "dialog6",
         "dialog7",
+        "dialog8",
       ].forEach((id, index) => {
         const dialog = document.getElementById(id);
         const statusId = `status${index + 1}`;
@@ -697,6 +698,57 @@
           type="button"
           class="BaseButton"
           commandfor="dialog7"
+          command="close"
+        >
+          Close
+        </button>
+      </div>
+    </dialog>
+
+    <!-- Test 8: Drag between the dialog and the backdrop -->
+    <section class="Section">
+      <h2 class="Section__Heading">
+        Test 8: Drag between the dialog and the backdrop
+      </h2>
+      <p>
+        With <code>closedby="any"</code>, the dialog closes only when the
+        press and the release both land on the backdrop. Press inside the
+        dialog (e.g. while selecting text), release on the backdrop: the
+        dialog stays open. The reverse drag keeps it open, too.
+      </p>
+      <div class="Section__Button">
+        <button
+          type="button"
+          class="BaseButton"
+          id="openDialog8"
+          commandfor="dialog8"
+          command="show-modal"
+        >
+          Open Dialog
+        </button>
+      </div>
+      <p class="BaseStatus" id="status8">Status: Closed</p>
+    </section>
+
+    <dialog
+      class="AppDialog"
+      id="dialog8"
+      closedby="any"
+      aria-labelledby="dialog8-title"
+      autofocus
+    >
+      <div class="AppDialog__Layout">
+        <h1 id="dialog8-title" class="AppDialog__Heading">
+          Drag test with closedby="any"
+        </h1>
+        <p>
+          Select this text and keep dragging past the dialog edge onto the
+          backdrop. The dialog stays open.
+        </p>
+        <button
+          type="button"
+          class="BaseButton"
+          commandfor="dialog8"
           command="close"
         >
           Close
